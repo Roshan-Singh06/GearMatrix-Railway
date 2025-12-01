@@ -286,3 +286,244 @@ document.addEventListener('DOMContentLoaded', ()=>{
   // default nav
   document.querySelector('[data-view="designer"]').click();
 });
+// ---------- Help / Guide renderer ----------
+function makeNodeFromHTML(html) {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstChild;
+}
+
+function toggleSection(el) {
+  const body = el.querySelector('.body');
+  if (!body) return;
+  const isOpen = body.style.display === 'block';
+  body.style.display = isOpen ? 'none' : 'block';
+}
+
+// Example presets (you can add more)
+const PRESETS = {
+  "Simple 2-stage reducer": {
+    rpm: 1500, torque: 8, unit: 'mm', torque_unit: 'Nm',
+    gears: [
+      {type:'Spur', teeth:20, radius:50, connects: '1'},
+      {type:'Spur', teeth:40, radius:100, connects: ''},
+    ]
+  },
+  "3-stage Helical chain": {
+    rpm:1000, torque: 10, unit:'mm', torque_unit:'Nm',
+    gears: [
+      {type:'Helical', teeth:18, radius:30, connects: '1'},
+      {type:'Helical', teeth:36, radius:60, connects: '2'},
+      {type:'Helical', teeth:18, radius:30, connects: ''},
+    ]
+  }
+};
+
+// Render the guide HTML into #help-root
+function renderHelp() {
+  const root = document.getElementById('help-root');
+  if (!root) return;
+  root.innerHTML = ''; // reset
+
+  const html = `
+    <div class="guide-title">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" style="flex:0 0 36px;">
+        <circle cx="12" cy="12" r="11" stroke="#0ea5e9" stroke-width="1.6" fill="#e6f7ff"/>
+        <path d="M8 12h8M8 8h8" stroke="#0369a1" stroke-width="1.4" stroke-linecap="round" />
+      </svg>
+      <h2 class="guide-title">GearMatrix Pro — Quick Guide</h2>
+    </div>
+
+    <div class="section" id="sec-basics">
+      <div class="header"><h3>1. Basics (Input RPM & Torque)</h3><div class="muted">click to expand</div></div>
+      <div class="body">
+        <p>Enter your driving <strong>RPM</strong> and <strong>Torque</strong>. Choose length & torque units. These are used to convert radii and torque propagation.</p>
+        <p class="hint">Tip: Use <code>mm</code> for radii unless you are working in inches.</p>
+      </div>
+    </div>
+
+    <div class="section" id="sec-gears">
+      <div class="header"><h3>2. Add & Configure Gears</h3><div class="muted">types, teeth, radius, connects</div></div>
+      <div class="body">
+        <p>Click <code>+ Add Gear</code> to add rows. Each row contains:</p>
+        <ul>
+          <li><strong>Type:</strong> Spur/Helical/Bevel/Internal</li>
+          <li><strong>Teeth:</strong> number of teeth</li>
+          <li><strong>Radius:</strong> pitch radius (your chosen length unit)</li>
+          <li><strong>Connects (csv):</strong> gear index(s) this gear drives — <em>use gear numbers like 0,1,2</em>.</li>
+        </ul>
+        <p class="hint">Important: <strong>Connects</strong> must be gear indices, not radii/teeth. Example chain: <code>0 → 1 → 2</code>.</p>
+      </div>
+    </div>
+
+    <div class="section" id="sec-connect">
+      <div class="header"><h3>3. Connecting Gears (Examples)</h3><div class="muted">how to avoid cycles</div></div>
+      <div class="body">
+        <p><strong>Valid chain</strong> (linear):</p>
+        <pre><code>Gear 0 connects: 1
+Gear 1 connects: 2
+Gear 2 connects: (empty)</code></pre>
+        <p><strong>Invalid (cycle):</strong> 0 → 1 → 2 → 0 — the app will show a cycle error.</p>
+      </div>
+    </div>
+
+    <div class="section" id="sec-presets">
+      <div class="header"><h3>Presets & Auto-fill</h3><div class="muted">try an example instantly</div></div>
+      <div class="body">
+        <p>Click a preset to auto-fill the form with example gears. After auto-fill, press <strong>Calculate</strong>.</p>
+        <div id="presets-container"></div>
+      </div>
+    </div>
+
+    <div class="section" id="sec-troubleshoot">
+      <div class="header"><h3>Troubleshooting</h3><div class="muted">quick fixes</div></div>
+      <div class="body">
+        <ul>
+          <li><strong>Error: Cycle detected</strong> — check your Connects values for loops or wrong indexes.</li>
+          <li><strong>Wrong RPM/Torque</strong> — verify gear teeth and radius are realistic; module should be radius/teeth.</li>
+          <li><strong>Graph not updating</strong> — make sure first gear (#0) has RPM & Torque inputs set.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <a class="btn-inline" id="open-tutorial-video" href="#" title="Open tutorial (if available)">Open short tutorial</a>
+      <span style="margin-left:12px" class="muted">Need a simpler UI? Ask for <strong>Auto-connect</strong> or <strong>Dropdown connects</strong>.</span>
+    </div>
+  `;
+
+  root.innerHTML = html;
+
+  // wire up collapsibles
+  Array.from(root.querySelectorAll('.section')).forEach(sec => {
+    const header = sec.querySelector('.header');
+    header.addEventListener('click', () => toggleSection(sec));
+    // default first two open
+    if (sec.id === 'sec-basics' || sec.id === 'sec-gears') {
+      sec.querySelector('.body').style.display = 'block';
+    }
+  });
+
+  // render presets
+  const presetsContainer = root.querySelector('#presets-container');
+  Object.entries(PRESETS).forEach(([name, preset]) => {
+    const box = document.createElement('div');
+    box.className = 'preset';
+    box.innerHTML = `
+      <div class="meta">
+        <strong>${name}</strong>
+        <div class="muted" style="font-size:13px">${preset.gears.length} gears • RPM ${preset.rpm} • Torque ${preset.torque} ${preset.torque_unit || ''}</div>
+      </div>
+      <div>
+        <button data-preset="${encodeURIComponent(name)}">Auto-Fill</button>
+      </div>
+    `;
+    presetsContainer.appendChild(box);
+
+    box.querySelector('button').addEventListener('click', () => {
+      autoFillPreset(preset);
+    });
+  });
+
+  // optional: tutorial link
+  const tut = root.querySelector('#open-tutorial-video');
+  tut.addEventListener('click', (e) => {
+    e.preventDefault();
+    alert('Tutorial feature not configured — you can add an embedded YouTube or video here.');
+  });
+}
+
+/* Auto-fill function: best attempt to populate your gear inputs.
+   You will probably need to adapt selectors to your form structure.
+   The function assumes:
+   - gear rows are DOM elements with class "gear-row"
+   - within each row: select elements / inputs with data attributes (data-gear-type, data-teeth, data-radius, data-connects)
+*/
+function autoFillPreset(preset) {
+  try {
+    // SELECTORS YOU MAY NEED TO ADJUST:
+    const gearRowSelector = '.gear-row'; // container for each gear (0..N-1)
+    const typeSelector = '[data-gear-type]';
+    const teethSelector = '[data-teeth]';
+    const radiusSelector = '[data-radius]';
+    const connectsSelector = '[data-connects]';
+
+    // find existing gear rows; if not enough, click the "+ Add Gear" button
+    let rows = Array.from(document.querySelectorAll(gearRowSelector));
+    const addBtn = document.querySelector('#add-gear-btn') || document.querySelector('.add-gear'); // fallback selectors
+
+    // ensure enough rows
+    while (rows.length < preset.gears.length) {
+      if (addBtn) addBtn.click();
+      // allow DOM update
+      rows = Array.from(document.querySelectorAll(gearRowSelector));
+    }
+
+    // fill top-level inputs (RPM, torque, units)
+    const rpmInput = document.querySelector('#input-rpm') || document.querySelector('[data-input-rpm]');
+    const torqueInput = document.querySelector('#input-torque') || document.querySelector('[data-input-torque]');
+    const lengthUnit = document.querySelector('#length-unit') || document.querySelector('[data-length-unit]');
+    const torqueUnit = document.querySelector('#torque-unit') || document.querySelector('[data-torque-unit]');
+
+    if (rpmInput) rpmInput.value = preset.rpm;
+    if (torqueInput) torqueInput.value = preset.torque;
+    if (lengthUnit) lengthUnit.value = preset.unit || 'mm';
+    if (torqueUnit) torqueUnit.value = preset.torque_unit || 'Nm';
+
+    // fill gear rows
+    preset.gears.forEach((g, i) => {
+      const row = rows[i];
+      if (!row) return;
+      const typeEl = row.querySelector(typeSelector);
+      const teethEl = row.querySelector(teethSelector);
+      const radiusEl = row.querySelector(radiusSelector);
+      const connectsEl = row.querySelector(connectsSelector);
+
+      if (typeEl) {
+        if (typeEl.tagName.toLowerCase() === 'select') {
+          typeEl.value = g.type;
+          typeEl.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+          typeEl.value = g.type;
+        }
+      }
+      if (teethEl) teethEl.value = g.teeth;
+      if (radiusEl) radiusEl.value = g.radius;
+      if (connectsEl) connectsEl.value = g.connects || '';
+    });
+
+    // optional: focus calculate button
+    const calcBtn = document.querySelector('#calculate-btn') || document.querySelector('.calculate-btn');
+    if (calcBtn) {
+      calcBtn.scrollIntoView({behavior: 'smooth'});
+      calcBtn.classList.add('highlight');
+      setTimeout(()=>calcBtn.classList.remove('highlight'), 1500);
+    }
+
+    // user feedback
+    alert('Preset applied. Press Calculate to compute results.');
+  } catch (err) {
+    console.error('AutoFill error', err);
+    alert('Auto-fill failed — your form selectors differ. I can adapt the function if you paste your gear row HTML structure.');
+  }
+}
+
+// call renderHelp when About tab shows
+// Replace this with your tab show event if different.
+document.addEventListener('DOMContentLoaded', () => {
+  // if you want the guide to render immediately into the About tab:
+  // renderHelp();
+
+  // Example: if you have a nav link with id "about-tab"
+  const aboutNav = document.querySelector('#about-tab');
+  if (aboutNav) {
+    aboutNav.addEventListener('click', () => {
+      renderHelp();
+    });
+  }
+
+  // If you use hash routing or show the About section on page load:
+  if (window.location.hash === '#about') renderHelp();
+});
+// ---------- end help renderer ----------
+
