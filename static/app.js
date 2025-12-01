@@ -1,4 +1,5 @@
-// app.js — Feature-rich frontend for GearMatrix Pro
+// app.js — Feature-rich frontend for GearMatrix Pro (patched)
+// Changes: added showSection(), safer help initialization, autoFillPreset adapted to your DOM
 let gearCount = 0;
 let chart = null;
 let lastCalc = null;
@@ -14,15 +15,58 @@ document.querySelectorAll('.sidebar nav li').forEach(li=>{
     li.classList.add('active');
     const view = li.getAttribute('data-view');
     document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-    document.getElementById(view).classList.remove('hidden');
+    // if data-view provided, show it
+    if (view) {
+      const el = document.getElementById(view);
+      if (el) el.classList.remove('hidden');
+      // if help view opened, render help content
+      if (view === 'help-section') {
+        // ensure help-root exists
+        ensureHelpRoot();
+        if (typeof renderHelp === 'function') renderHelp();
+        else if (typeof loadHelpContent === 'function') loadHelpContent();
+      }
+    }
   });
 });
-document.getElementById("help-tab").addEventListener("click", function () {
-    showSection("help-section");
-    loadHelpContent();
+
+// Keep the manual help-tab listener but call the unified helper so no error
+const helpTabEl = document.getElementById("help-tab");
+if (helpTabEl) helpTabEl.addEventListener("click", function () {
+    // prefer to use existing nav mechanics if data-view is set, otherwise call showSection
+    const view = helpTabEl.getAttribute('data-view') || "help-section";
+    showSection(view);
 });
 
+// --- Small helper to show a section by id (keeps existing nav logic consistent) ---
+function showSection(sectionId) {
+  // hide all views
+  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+  const el = document.getElementById(sectionId);
+  if (!el) return;
+  el.classList.remove('hidden');
 
+  // if it's help-section, ensure help-root exists and render help
+  if (sectionId === 'help-section') {
+    ensureHelpRoot();
+    if (typeof renderHelp === 'function') {
+      renderHelp();
+    } else if (typeof loadHelpContent === 'function') {
+      loadHelpContent();
+    }
+  }
+}
+
+// ensure #help-root exists inside #help-section (so renderHelp can safely write)
+function ensureHelpRoot(){
+  const helpSection = document.getElementById('help-section');
+  if (!helpSection) return;
+  if (!helpSection.querySelector('#help-root')) {
+    const div = document.createElement('div');
+    div.id = 'help-root';
+    helpSection.appendChild(div);
+  }
+}
 
 const themeToggle = $('themeToggle');
 
@@ -37,7 +81,6 @@ function applyTheme() {
     document.documentElement.style.setProperty('--text', '#e6f7ff');
     document.documentElement.style.setProperty('--muted', '#9fb4c6');
     document.documentElement.style.setProperty('--accent', '#0ea5e9');
-    // update button label so user knows current action
     if (themeToggle) themeToggle.textContent = 'Light';
   } else {
     // Set CSS variables for light theme
@@ -49,7 +92,6 @@ function applyTheme() {
     if (themeToggle) themeToggle.textContent = 'Dark';
   }
 
-  // Also ensure body uses the --bg var immediately
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || (t === 'dark' ? '#071023' : '#ffffff');
   document.body.style.background = bg;
 }
@@ -70,12 +112,11 @@ applyTheme();
 
 
 // ----------------- Login modal (mock) -----------------
-$('openLogin').addEventListener('click', ()=> $('loginModal').classList.remove('hidden'));
-$('loginCancel').addEventListener('click', ()=> $('loginModal').classList.add('hidden'));
-$('loginSubmit').addEventListener('click', ()=>{
+if ($('openLogin')) $('openLogin').addEventListener('click', ()=> $('loginModal').classList.remove('hidden'));
+if ($('loginCancel')) $('loginCancel').addEventListener('click', ()=> $('loginModal').classList.add('hidden'));
+if ($('loginSubmit')) $('loginSubmit').addEventListener('click', ()=>{
   const u = $('loginUser').value, p = $('loginPass').value;
   if(!u){ alert('enter user'); return; }
-  // mock: store user
   localStorage.setItem('gm-user', JSON.stringify({user:u, ts:Date.now()}));
   $('loginModal').classList.add('hidden');
   alert('Logged in as ' + u + ' (mock)');
@@ -99,6 +140,12 @@ function addGear(preset={}) {
     <button onclick="removeGear(${id})" class="btn small">Del</button>
   `;
   container.appendChild(row);
+
+  // if preset contains a type, set it
+  if (preset.type) {
+    const sel = document.getElementById(`type-${id}`);
+    if (sel) sel.value = preset.type;
+  }
 }
 function removeGear(id){ const el = $('gear-'+id); if(el) el.remove(); }
 
@@ -106,11 +153,11 @@ function removeGear(id){ const el = $('gear-'+id); if(el) el.remove(); }
 addGear();
 
 // ----------------- API actions -----------------
-$('addGear').addEventListener('click', ()=> addGear());
-$('calcBtn').addEventListener('click', calculate);
+if ($('addGear')) $('addGear').addEventListener('click', ()=> addGear());
+if ($('calcBtn')) $('calcBtn').addEventListener('click', calculate);
 
 // save/list/load
-$('saveSet').addEventListener('click', async()=>{
+if ($('saveSet')) $('saveSet').addEventListener('click', async()=>{
   const name = prompt('Set name (alphanumeric)');
   if(!name) return;
   const payload = buildPayload();
@@ -118,13 +165,14 @@ $('saveSet').addEventListener('click', async()=>{
   const r = await api('/api/save-set', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
   if(r.error) alert('Save failed: '+r.error); else alert('Saved: '+r.filename);
 });
-$('listSets').addEventListener('click', async()=>{
+if ($('listSets')) $('listSets').addEventListener('click', async()=>{
   const r = await api('/api/list-sets');
   if(r.sets) {
     const out = r.sets.map(s=>`<div><a href="#" onclick="loadSet('${s}')">${s}</a></div>`).join('');
-    $('savedList').innerHTML = out || '(no sets)';
+    if ($('savedList')) $('savedList').innerHTML = out || '(no sets)';
     // jump to Saved tab
-    document.querySelector('[data-view="saved"]').click();
+    const savedNav = document.querySelector('[data-view="saved"]');
+    if (savedNav) savedNav.click();
   }
 });
 
@@ -134,17 +182,17 @@ window.loadSet = async (name) => {
   // populate UI
   // clear current
   $('gears').innerHTML=''; gearCount=0;
-  $('rpm').value = r.rpm_input || $('rpm').value;
-  $('torque').value = r.torque_input || $('torque').value;
+  if (r.rpm_input) { if ($('rpm')) $('rpm').value = r.rpm_input; }
+  if (r.torque_input) { if ($('torque')) $('torque').value = r.torque_input; }
   (r.gears || []).forEach(g => addGear(g));
   alert('Loaded set: '+name);
-  document.querySelector('[data-view="designer"]').click();
+  const designerNav = document.querySelector('[data-view="designer"]');
+  if (designerNav) designerNav.click();
 };
 
 // export CSV via backend (requires lastCalc)
-$('exportCsv').addEventListener('click', async ()=>{
+if ($('exportCsv')) $('exportCsv').addEventListener('click', async ()=>{
   if(!lastCalc){ alert('Run calculation first'); return; }
-  // backend expects POST /api/export-csv with last_result payload
   const res = await fetch('/api/export-csv', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastCalc)});
   if(!res.ok){ const err = await res.json(); alert('Export failed: '+(err.error||res.statusText)); return; }
   const blob = await res.blob();
@@ -153,7 +201,7 @@ $('exportCsv').addEventListener('click', async ()=>{
 });
 
 // export PDF (client-side)
-$('exportPdf').addEventListener('click', async ()=>{
+if ($('exportPdf')) $('exportPdf').addEventListener('click', async ()=>{
   if(!lastCalc){ alert('Run calculation first'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
@@ -173,20 +221,25 @@ $('exportPdf').addEventListener('click', async ()=>{
 
 // ----------------- Build payload -----------------
 function buildPayload(){
-  const unit = $('unit').value;
-  const torqueUnit = $('torqueUnit').value;
-  const rpm = $('rpm').value; const torque = $('torque').value;
+  const unit = $('unit') ? $('unit').value : (document.querySelector('[data-length-unit]') ? document.querySelector('[data-length-unit]').value : 'mm');
+  const torqueUnit = $('torqueUnit') ? $('torqueUnit').value : (document.querySelector('[data-torque-unit]') ? document.querySelector('[data-torque-unit]').value : 'Nm');
+  const rpm = $('rpm') ? $('rpm').value : (document.querySelector('[data-input-rpm]') ? document.querySelector('[data-input-rpm]').value : 0);
+  const torque = $('torque') ? $('torque').value : (document.querySelector('[data-input-torque]') ? document.querySelector('[data-input-torque]').value : 0);
   const gears = [];
   for(let i=0;i<gearCount;i++){
     const row = $('gear-'+i);
     if(!row) continue;
+    const getVal = id => {
+      const el = document.getElementById(id);
+      return el ? el.value : '';
+    };
     gears.push({
-      type: $('type-'+i).value,
-      teeth: $('teeth-'+i).value,
-      radius: $('radius-'+i).value,
-      module: $('module-'+i).value,
-      connects: $('connects-'+i).value,
-      mesh_eff: $('mesh-'+i).value
+      type: getVal(`type-${i}`),
+      teeth: getVal(`teeth-${i}`),
+      radius: getVal(`radius-${i}`),
+      module: getVal(`module-${i}`),
+      connects: getVal(`connects-${i}`),
+      mesh_eff: getVal(`mesh-${i}`)
     });
   }
   return { unit, torque_unit: torqueUnit, rpm_input: rpm, torque_input: torque, gears };
@@ -197,9 +250,9 @@ async function calculate(){
   const payload = buildPayload();
   const res = await fetch('/api/calc', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
   const data = await res.json();
-  if(data.error){ $('resultText').textContent = 'Error: '+data.error; return; }
+  if(data.error){ if ($('resultText')) $('resultText').textContent = 'Error: '+data.error; return; }
   lastCalc = data;
-  $('resultText').textContent = JSON.stringify(data, null, 2);
+  if ($('resultText')) $('resultText').textContent = JSON.stringify(data, null, 2);
   drawChart(data);
   drawDiagram(payload, data);
 }
@@ -210,7 +263,9 @@ function drawChart(data){
   const idxs = Object.keys(gearStates).map(Number).sort((a,b)=>a-b);
   const rpms = idxs.map(i => gearStates[i].rpm || 0);
   const torques = idxs.map(i => gearStates[i].torque || 0);
-  const ctx = $('chart').getContext('2d');
+  const canvas = $('chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
   if(chart) chart.destroy();
   chart = new Chart(ctx, {
     type: 'line',
@@ -236,8 +291,8 @@ function drawChart(data){
 // ----------------- Simple 2D Gear Diagram -----------------
 function drawDiagram(payload, calcData){
   const container = $('diagramArea');
+  if (!container) return;
   container.innerHTML = ''; // clear
-  // compute simple layout: place gears on a horizontal line, x positions accumulate radius
   const gears = payload.gears || [];
   if(gears.length===0){ container.innerHTML = '<em>No gears</em>'; return; }
   const svgNS = "http://www.w3.org/2000/svg";
@@ -245,7 +300,6 @@ function drawDiagram(payload, calcData){
   svg.setAttribute('width','100%'); svg.setAttribute('height','360'); svg.setAttribute('viewBox','0 0 1200 360');
   let x = 80;
   const scale = 2.5; // scale radii to px
-  // store centers
   const centers = [];
   gears.forEach((g,i)=>{
     const r = Math.max(6, Number(g.radius||50) * scale / 10);
@@ -278,7 +332,6 @@ function drawDiagram(payload, calcData){
     text.setAttribute('x', ct.cx); text.setAttribute('y', ct.cy+4); text.setAttribute('text-anchor','middle');
     text.setAttribute('font-size','12'); text.setAttribute('fill','#0f172a'); text.textContent = `G${i}`;
     ggroup.appendChild(text);
-    // small rotate animation
     ggroup.style.transformOrigin = `${ct.cx}px ${ct.cy}px`;
     ggroup.style.animation = `spin ${8 - (i%5)}s linear infinite`;
     svg.appendChild(ggroup);
@@ -289,8 +342,13 @@ function drawDiagram(payload, calcData){
 // initial hook
 document.addEventListener('DOMContentLoaded', ()=>{
   // default nav
-  document.querySelector('[data-view="designer"]').click();
+  const defaultNav = document.querySelector('[data-view="designer"]') || document.querySelector('.sidebar nav li');
+  if (defaultNav) defaultNav.click();
+  // prepare help content skeleton so it's ready when user opens Help
+  ensureHelpRoot();
+  if (typeof renderHelp === 'function') renderHelp();
 });
+
 // ---------- Help / Guide renderer ----------
 function makeNodeFromHTML(html) {
   const t = document.createElement('template');
@@ -326,12 +384,14 @@ const PRESETS = {
 
 // Render the guide HTML into #help-root
 function renderHelp() {
+  // ensure help-root exists
+  ensureHelpRoot();
   const root = document.getElementById('help-root');
   if (!root) return;
   root.innerHTML = ''; // reset
 
   const html = `
-    <div class="guide-title">
+    <div class="guide-title" style="display:flex; gap:12px; align-items:center;">
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" style="flex:0 0 36px;">
         <circle cx="12" cy="12" r="11" stroke="#0ea5e9" stroke-width="1.6" fill="#e6f7ff"/>
         <path d="M8 12h8M8 8h8" stroke="#0369a1" stroke-width="1.4" stroke-linecap="round" />
@@ -339,17 +399,17 @@ function renderHelp() {
       <h2 class="guide-title">GearMatrix Pro — Quick Guide</h2>
     </div>
 
-    <div class="section" id="sec-basics">
-      <div class="header"><h3>1. Basics (Input RPM & Torque)</h3><div class="muted">click to expand</div></div>
-      <div class="body">
+    <div class="section" id="sec-basics" style="border-bottom:1px solid #e6eef7; padding:10px 0;">
+      <div class="header" style="cursor:pointer;"><h3>1. Basics (Input RPM & Torque)</h3><div class="muted">click to expand</div></div>
+      <div class="body" style="display:none; padding:8px 0;">
         <p>Enter your driving <strong>RPM</strong> and <strong>Torque</strong>. Choose length & torque units. These are used to convert radii and torque propagation.</p>
         <p class="hint">Tip: Use <code>mm</code> for radii unless you are working in inches.</p>
       </div>
     </div>
 
-    <div class="section" id="sec-gears">
-      <div class="header"><h3>2. Add & Configure Gears</h3><div class="muted">types, teeth, radius, connects</div></div>
-      <div class="body">
+    <div class="section" id="sec-gears" style="border-bottom:1px solid #e6eef7; padding:10px 0;">
+      <div class="header" style="cursor:pointer;"><h3>2. Add & Configure Gears</h3><div class="muted">types, teeth, radius, connects</div></div>
+      <div class="body" style="display:none; padding:8px 0;">
         <p>Click <code>+ Add Gear</code> to add rows. Each row contains:</p>
         <ul>
           <li><strong>Type:</strong> Spur/Helical/Bevel/Internal</li>
@@ -361,9 +421,9 @@ function renderHelp() {
       </div>
     </div>
 
-    <div class="section" id="sec-connect">
-      <div class="header"><h3>3. Connecting Gears (Examples)</h3><div class="muted">how to avoid cycles</div></div>
-      <div class="body">
+    <div class="section" id="sec-connect" style="border-bottom:1px solid #e6eef7; padding:10px 0;">
+      <div class="header" style="cursor:pointer;"><h3>3. Connecting Gears (Examples)</h3><div class="muted">how to avoid cycles</div></div>
+      <div class="body" style="display:none; padding:8px 0;">
         <p><strong>Valid chain</strong> (linear):</p>
         <pre><code>Gear 0 connects: 1
 Gear 1 connects: 2
@@ -372,17 +432,17 @@ Gear 2 connects: (empty)</code></pre>
       </div>
     </div>
 
-    <div class="section" id="sec-presets">
-      <div class="header"><h3>Presets & Auto-fill</h3><div class="muted">try an example instantly</div></div>
-      <div class="body">
+    <div class="section" id="sec-presets" style="border-bottom:1px solid #e6eef7; padding:10px 0;">
+      <div class="header" style="cursor:pointer;"><h3>Presets & Auto-fill</h3><div class="muted">try an example instantly</div></div>
+      <div class="body" style="display:none; padding:8px 0;">
         <p>Click a preset to auto-fill the form with example gears. After auto-fill, press <strong>Calculate</strong>.</p>
-        <div id="presets-container"></div>
+        <div id="presets-container" style="display:flex;flex-direction:column; gap:8px;"></div>
       </div>
     </div>
 
-    <div class="section" id="sec-troubleshoot">
-      <div class="header"><h3>Troubleshooting</h3><div class="muted">quick fixes</div></div>
-      <div class="body">
+    <div class="section" id="sec-troubleshoot" style="padding:10px 0;">
+      <div class="header" style="cursor:pointer;"><h3>Troubleshooting</h3><div class="muted">quick fixes</div></div>
+      <div class="body" style="display:none; padding:8px 0;">
         <ul>
           <li><strong>Error: Cycle detected</strong> — check your Connects values for loops or wrong indexes.</li>
           <li><strong>Wrong RPM/Torque</strong> — verify gear teeth and radius are realistic; module should be radius/teeth.</li>
@@ -405,7 +465,8 @@ Gear 2 connects: (empty)</code></pre>
     header.addEventListener('click', () => toggleSection(sec));
     // default first two open
     if (sec.id === 'sec-basics' || sec.id === 'sec-gears') {
-      sec.querySelector('.body').style.display = 'block';
+      const b = sec.querySelector('.body');
+      if (b) b.style.display = 'block';
     }
   });
 
@@ -414,13 +475,14 @@ Gear 2 connects: (empty)</code></pre>
   Object.entries(PRESETS).forEach(([name, preset]) => {
     const box = document.createElement('div');
     box.className = 'preset';
+    box.style.display = 'flex'; box.style.justifyContent = 'space-between'; box.style.alignItems = 'center';
     box.innerHTML = `
       <div class="meta">
         <strong>${name}</strong>
         <div class="muted" style="font-size:13px">${preset.gears.length} gears • RPM ${preset.rpm} • Torque ${preset.torque} ${preset.torque_unit || ''}</div>
       </div>
       <div>
-        <button data-preset="${encodeURIComponent(name)}">Auto-Fill</button>
+        <button data-preset="${encodeURIComponent(name)}" class="btn">Auto-Fill</button>
       </div>
     `;
     presetsContainer.appendChild(box);
@@ -432,80 +494,81 @@ Gear 2 connects: (empty)</code></pre>
 
   // optional: tutorial link
   const tut = root.querySelector('#open-tutorial-video');
-  tut.addEventListener('click', (e) => {
-    e.preventDefault();
-    alert('Tutorial feature not configured — you can add an embedded YouTube or video here.');
-  });
+  if (tut) {
+    tut.addEventListener('click', (e) => {
+      e.preventDefault();
+      alert('Tutorial feature not configured — you can add an embedded YouTube or video here.');
+    });
+  }
 }
 
-/* Auto-fill function: best attempt to populate your gear inputs.
-   You will probably need to adapt selectors to your form structure.
-   The function assumes:
-   - gear rows are DOM elements with class "gear-row"
-   - within each row: select elements / inputs with data attributes (data-gear-type, data-teeth, data-radius, data-connects)
+/* Auto-fill function adapted to your form structure.
+   Your addGear() creates rows with:
+     - div.gear-row id="gear-<i>"
+     - select#type-<i>, input#teeth-<i>, input#radius-<i>, input#module-<i>, input#connects-<i>, input#mesh-<i>
 */
 function autoFillPreset(preset) {
   try {
-    // SELECTORS YOU MAY NEED TO ADJUST:
-    const gearRowSelector = '.gear-row'; // container for each gear (0..N-1)
-    const typeSelector = '[data-gear-type]';
-    const teethSelector = '[data-teeth]';
-    const radiusSelector = '[data-radius]';
-    const connectsSelector = '[data-connects]';
-
     // find existing gear rows; if not enough, click the "+ Add Gear" button
-    let rows = Array.from(document.querySelectorAll(gearRowSelector));
-    const addBtn = document.querySelector('#add-gear-btn') || document.querySelector('.add-gear'); // fallback selectors
+    let rows = Array.from(document.querySelectorAll('.gear-row'));
+    const addBtn = document.querySelector('#addGear') || document.querySelector('#add-gear-btn') || document.querySelector('.add-gear');
 
     // ensure enough rows
     while (rows.length < preset.gears.length) {
-      if (addBtn) addBtn.click();
-      // allow DOM update
-      rows = Array.from(document.querySelectorAll(gearRowSelector));
+      if (addBtn) {
+        addBtn.click();
+      } else {
+        // fallback: call addGear() directly if button not found
+        if (typeof addGear === 'function') addGear();
+      }
+      rows = Array.from(document.querySelectorAll('.gear-row'));
     }
 
     // fill top-level inputs (RPM, torque, units)
-    const rpmInput = document.querySelector('#input-rpm') || document.querySelector('[data-input-rpm]');
-    const torqueInput = document.querySelector('#input-torque') || document.querySelector('[data-input-torque]');
-    const lengthUnit = document.querySelector('#length-unit') || document.querySelector('[data-length-unit]');
-    const torqueUnit = document.querySelector('#torque-unit') || document.querySelector('[data-torque-unit]');
+    const rpmInput = document.querySelector('#rpm') || document.querySelector('[data-input-rpm]');
+    const torqueInput = document.querySelector('#torque') || document.querySelector('[data-input-torque]');
+    const lengthUnit = document.querySelector('#unit') || document.querySelector('[data-length-unit]');
+    const torqueUnit = document.querySelector('#torqueUnit') || document.querySelector('[data-torque-unit]');
 
     if (rpmInput) rpmInput.value = preset.rpm;
     if (torqueInput) torqueInput.value = preset.torque;
     if (lengthUnit) lengthUnit.value = preset.unit || 'mm';
     if (torqueUnit) torqueUnit.value = preset.torque_unit || 'Nm';
 
-    // fill gear rows
+    // fill gear rows using your actual id-based inputs
     preset.gears.forEach((g, i) => {
-      const row = rows[i];
+      const row = document.getElementById(`gear-${i}`);
       if (!row) return;
-      const typeEl = row.querySelector(typeSelector);
-      const teethEl = row.querySelector(teethSelector);
-      const radiusEl = row.querySelector(radiusSelector);
-      const connectsEl = row.querySelector(connectsSelector);
+      const typeEl = row.querySelector(`#type-${i}`);
+      const teethEl = row.querySelector(`#teeth-${i}`);
+      const radiusEl = row.querySelector(`#radius-${i}`);
+      const moduleEl = row.querySelector(`#module-${i}`);
+      const connectsEl = row.querySelector(`#connects-${i}`);
+      const meshEl = row.querySelector(`#mesh-${i}`);
 
       if (typeEl) {
         if (typeEl.tagName.toLowerCase() === 'select') {
-          typeEl.value = g.type;
+          typeEl.value = g.type || typeEl.options[0].value;
           typeEl.dispatchEvent(new Event('change', { bubbles: true }));
         } else {
-          typeEl.value = g.type;
+          typeEl.value = g.type || '';
         }
       }
-      if (teethEl) teethEl.value = g.teeth;
-      if (radiusEl) radiusEl.value = g.radius;
+      if (teethEl) teethEl.value = g.teeth || '';
+      if (radiusEl) radiusEl.value = g.radius || '';
+      if (moduleEl) moduleEl.value = g.module || '';
       if (connectsEl) connectsEl.value = g.connects || '';
+      if (meshEl) meshEl.value = g.mesh_eff || (g.mesh_eff === 0 ? 0 : 98);
     });
 
-    // optional: focus calculate button
-    const calcBtn = document.querySelector('#calculate-btn') || document.querySelector('.calculate-btn');
+    // highlight calculate button if present
+    const calcBtn = document.querySelector('#calcBtn') || document.querySelector('.calculate-btn') || document.querySelector('#calculate-btn');
     if (calcBtn) {
       calcBtn.scrollIntoView({behavior: 'smooth'});
       calcBtn.classList.add('highlight');
       setTimeout(()=>calcBtn.classList.remove('highlight'), 1500);
     }
 
-    // user feedback
     alert('Preset applied. Press Calculate to compute results.');
   } catch (err) {
     console.error('AutoFill error', err);
@@ -513,8 +576,10 @@ function autoFillPreset(preset) {
   }
 }
 
+// ---------- Simple fallback loader (kept for backward compatibility) ----------
 function loadHelpContent() {
-    document.getElementById("help-section").innerHTML = `
+    ensureHelpRoot();
+    document.getElementById("help-root").innerHTML = `
         <h1>Help & User Guide</h1>
         <p>Welcome to <strong>GearMatrix Pro</strong>. This guide explains everything you need to design, calculate, and validate multi-stage gear systems.</p>
 
@@ -564,6 +629,4 @@ function loadHelpContent() {
         <p><strong>You're all set—GearMatrix Pro is your digital gearbox engineer!</strong></p>
     `;
 }
-
 // ---------- end help renderer ----------
-
