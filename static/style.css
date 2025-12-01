@@ -89,3 +89,68 @@ input,select{padding:10px;border-radius:8px;border:1px solid #e6eef6;background:
   .sidebar{width:100%;order:2}
   .main{order:1}
 }
+/* Help / Guide styles */
+.help-root {
+  padding: 20px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(13, 38, 76, 0.06);
+  color: #0f172a;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+/* Headline */
+.help-root .guide-title {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:12px;
+}
+.help-root h2.guide-title { font-size:20px; margin:0; color:#08386b; }
+
+/* Collapsible sections */
+.help-root .section {
+  border-radius:8px;
+  margin: 10px 0;
+  overflow:hidden;
+  border:1px solid #eef2f7;
+}
+.help-root .section .header {
+  background:#f7fbff;
+  padding:12px 14px;
+  cursor:pointer;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.help-root .section .header h3 { margin:0; font-size:15px; color:#084060; }
+.help-root .section .body {
+  padding:12px 14px;
+  display:none;
+  background: #ffffff;
+  color:#213547;
+  line-height:1.5;
+}
+
+/* Buttons and small UI */
+.help-root .muted { color:#617489; font-size:13px; }
+.help-root .btn-inline {
+  display:inline-block;
+  margin-left:8px;
+  background:#0ea5e9;
+  color:white;padding:6px 10px;border-radius:6px;font-weight:600;
+  text-decoration:none;font-size:13px;
+}
+.help-root code { background:#f3f6fb; padding:4px 6px; border-radius:4px; font-family:monospace; }
+
+/* Example preset box */
+.help-root .preset {
+  display:flex; gap:8px; align-items:center;
+  padding:10px; border:1px dashed #e6eef7; border-radius:8px; margin-top:8px;
+}
+.help-root .preset .meta { flex:1; }
+.help-root .preset button { background:#06b6d4; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+
+/* small copy hint */
+.help-root .hint { font-size:13px; color:#5b6b7a; }
+
