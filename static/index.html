@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GearMatrix Pro — Web</title>
+
+  <!-- Chart.js + zoom plugin + jsPDF -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.2.1/dist/chartjs-plugin-zoom.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <div class="logo-wrap">
+        <!-- animated gear SVG -->
+        <svg id="logo-gear" viewBox="0 0 100 100" width="44" height="44" class="gear-anim">
+          <g transform="translate(50,50)">
+            <path fill="#fff" d="M0,-28 L5,-22 L12,-20 L18,-22 L24,-16 L22,-10 L28,-5 L28,5 L22,10 L24,16 L18,22 L12,20 L5,22 L0,28 L-5,22 L-12,20 L-18,22 L-24,16 L-22,10 L-28,5 L-28,-5 L-22,-10 L-24,-16 L-18,-22 L-12,-20 L-5,-22 Z" />
+            <circle r="10" fill="#38bdf8"/>
+            <circle r="5" fill="#fff"/>
+          </g>
+        </svg>
+      </div>
+      <h1>GearMatrix Pro</h1>
+    </div>
+
+    <div class="header-right">
+      <button id="themeToggle" class="btn small">Toggle Theme</button>
+      <button id="openLogin" class="btn small">Login</button>
+    </div>
+  </header>
+
+  <!-- Layout: sidebar + main -->
+  <div class="app">
+    <aside class="sidebar">
+      <nav>
+        <ul>
+          <li class="active" data-view="designer">Designer</li>
+          <li data-view="diagram">Diagram</li>
+          <li data-view="saved">Saved Sets</li>
+          <li data-view="about">About</li>
+        </ul>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="exportCsv" class="btn tiny">Export CSV</button>
+        <button id="exportPdf" class="btn tiny">Export PDF</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- Designer view -->
+      <section id="designer" class="view">
+        <div class="row">
+          <div class="col card">
+            <h2>Input Parameters</h2>
+            <div class="form-grid">
+              <label>Input RPM <input id="rpm" value="1000"></label>
+              <label>Input Torque <input id="torque" value="10"></label>
+              <label>Length Unit
+                <select id="unit">
+                  <option>mm</option><option>cm</option><option>m</option><option>inch</option>
+                </select>
+              </label>
+              <label>Torque Unit
+                <select id="torqueUnit"><option>Nm</option><option>kgm</option><option>lbf-ft</option></select>
+              </label>
+            </div>
+
+            <div class="actions">
+              <button id="addGear" class="btn primary">+ Add Gear</button>
+              <button id="calcBtn" class="btn accent">Calculate</button>
+              <button id="saveSet" class="btn">Save Set</button>
+              <button id="listSets" class="btn">List Saved</button>
+            </div>
+
+            <h3 style="margin-top:18px;">Gears</h3>
+            <div id="gears"></div>
+          </div>
+
+          <div class="col card">
+            <h2>Results</h2>
+            <pre id="resultText" class="result-box">No calculation yet</pre>
+
+            <h3 style="margin-top:12px;">RPM & Torque</h3>
+            <canvas id="chart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Diagram view -->
+      <section id="diagram" class="view hidden">
+        <div class="card">
+          <h2>2D Gear Diagram</h2>
+          <div id="diagramArea" class="diagram-area"></div>
+        </div>
+      </section>
+
+      <!-- Saved sets -->
+      <section id="saved" class="view hidden">
+        <div class="card">
+          <h2>Saved Gear Sets</h2>
+          <div id="savedList">(Click "List Saved" to load)</div>
+        </div>
+      </section>
+
+      <!-- About -->
+      <section id="about" class="view hidden">
+        <div class="card">
+          <h2>About GearMatrix Pro</h2>
+          <p>Web edition — improved UX, export, diagram and save/load. Built for quick engineering checks and demos.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Login Modal (simple mock) -->
+  <div id="loginModal" class="modal hidden">
+    <div class="modal-card">
+      <h3>Sign In</h3>
+      <label>User <input id="loginUser"></label>
+      <label>Password <input id="loginPass" type="password"></label>
+      <div style="text-align:right;margin-top:10px;">
+        <button id="loginCancel" class="btn">Cancel</button>
+        <button id="loginSubmit" class="btn primary">Sign In</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
