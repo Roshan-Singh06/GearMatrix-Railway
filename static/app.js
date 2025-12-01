@@ -17,6 +17,11 @@ document.querySelectorAll('.sidebar nav li').forEach(li=>{
     document.getElementById(view).classList.remove('hidden');
   });
 });
+document.getElementById("help-tab").addEventListener("click", function () {
+    showSection("help-section");
+    loadHelpContent();
+});
+
 
 
 const themeToggle = $('themeToggle');
@@ -508,22 +513,57 @@ function autoFillPreset(preset) {
   }
 }
 
-// call renderHelp when About tab shows
-// Replace this with your tab show event if different.
-document.addEventListener('DOMContentLoaded', () => {
-  // if you want the guide to render immediately into the About tab:
-  // renderHelp();
+function loadHelpContent() {
+    document.getElementById("help-section").innerHTML = `
+        <h1>Help & User Guide</h1>
+        <p>Welcome to <strong>GearMatrix Pro</strong>. This guide explains everything you need to design, calculate, and validate multi-stage gear systems.</p>
 
-  // Example: if you have a nav link with id "about-tab"
-  const aboutNav = document.querySelector('#about-tab');
-  if (aboutNav) {
-    aboutNav.addEventListener('click', () => {
-      renderHelp();
-    });
-  }
+        <h2>1. Designer Section</h2>
+        <ul>
+            <li>Enter <strong>Input RPM</strong> and <strong>Input Torque</strong>.</li>
+            <li>Select units for torque and length.</li>
+            <li>Click <strong>+ Add Gear</strong> to insert gears.</li>
+            <li>Select gear type: Spur, Helical, Bevel, or Internal.</li>
+            <li>Enter teeth and module.</li>
+            <li>Use the field <strong>Connects (csv)</strong> to specify which gears mesh.</li>
+            <li>Click <strong>Calculate</strong> to compute RPM & torque across all stages.</li>
+        </ul>
 
-  // If you use hash routing or show the About section on page load:
-  if (window.location.hash === '#about') renderHelp();
-});
+        <h2>2. Diagram Section</h2>
+        <ul>
+            <li>Shows a real-time schematic of your gear system.</li>
+            <li>Use it to visually confirm gear connectivity.</li>
+        </ul>
+
+        <h2>3. Saved Sets</h2>
+        <ul>
+            <li>Store your configurations using <strong>Save Set</strong>.</li>
+            <li>Load previous gear trains using <strong>List Saved</strong>.</li>
+        </ul>
+
+        <h2>4. Export Tools</h2>
+        <ul>
+            <li><strong>Export CSV</strong> → gear data for spreadsheets.</li>
+            <li><strong>Export PDF</strong> → complete design + calculations.</li>
+        </ul>
+
+        <h2>5. Common Errors</h2>
+        <ul>
+            <li><strong>Error: Cycle detected</strong> → gear connection loop; fix the chain.</li>
+            <li><strong>Module mismatch</strong> → gears mesh only if modules match.</li>
+            <li><strong>Impossible tooth counts</strong> → check if gear ratio is realistic.</li>
+        </ul>
+
+        <h2>6. Tips</h2>
+        <ul>
+            <li>Use different gear types to simulate complex gearboxes.</li>
+            <li>Internal gears reverse rotation behavior.</li>
+            <li>Export results to document your design workflow.</li>
+        </ul>
+
+        <p><strong>You're all set—GearMatrix Pro is your digital gearbox engineer!</strong></p>
+    `;
+}
+
 // ---------- end help renderer ----------
 
