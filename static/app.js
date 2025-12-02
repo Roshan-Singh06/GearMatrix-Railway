@@ -630,3 +630,56 @@ function loadHelpContent() {
     `;
 }
 // ---------- end help renderer ----------
+// mobile sidebar toggle
+document.addEventListener('DOMContentLoaded', () => {
+  const sidebar = document.querySelector('.sidebar');
+  const openBtn = document.querySelector('#hamburgerBtn'); // add this id to burger
+  const overlay = document.createElement('div');
+  overlay.className = 'mobile-overlay';
+  Object.assign(overlay.style, {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', zIndex: 40, display: 'none'
+  });
+  document.body.appendChild(overlay);
+
+  function openSidebar(){
+    if(!sidebar) return;
+    sidebar.classList.add('open');
+    overlay.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar(){
+    if(!sidebar) return;
+    sidebar.classList.remove('open');
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  if(openBtn){
+    openBtn.addEventListener('click', () => {
+      if(sidebar.classList.contains('open')) closeSidebar();
+      else openSidebar();
+    });
+  }
+  overlay.addEventListener('click', closeSidebar);
+
+  // close on swipe left for mobile (simple)
+  let startX = null;
+  sidebar.addEventListener('touchstart', e => startX = e.touches[0].clientX, {passive:true});
+  sidebar.addEventListener('touchend', e => {
+    if(!startX) return;
+    const endX = e.changedTouches[0].clientX;
+    if (startX - endX > 60) closeSidebar();
+    startX = null;
+  }, {passive:true});
+});
+const ctx = document.getElementById('myChart');
+const myChart = new Chart(ctx, {
+  type: 'line',
+  data: {...},
+  options: {
+    responsive: true,
+    maintainAspectRatio: false, // allows height control via CSS
+    // other options
+  }
+});
+
