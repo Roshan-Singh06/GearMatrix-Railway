@@ -682,4 +682,17 @@ const myChart = new Chart(ctx, {
     // other options
   }
 });
+document.addEventListener('DOMContentLoaded', () => {
+  const sidebar = document.querySelector('.sidebar');
+  const hb = document.getElementById('hamburgerBtn');
+  const overlay = document.createElement('div');
+  overlay.style = 'position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:50;display:none';
+  document.body.appendChild(overlay);
+  function open(){ sidebar?.classList.add('open'); overlay.style.display='block'; document.body.style.overflow='hidden'; }
+  function close(){ sidebar?.classList.remove('open'); overlay.style.display='none'; document.body.style.overflow=''; }
+  hb?.addEventListener('click', ()=> sidebar?.classList.contains('open') ? close() : open());
+  overlay.addEventListener('click', close);
+});
+new Chart(ctx, { type:'line', data:..., options:{ responsive:true, maintainAspectRatio:false } });
+
 
