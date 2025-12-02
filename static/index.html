@@ -1,157 +1,240 @@
 <!doctype html>
 <html lang="en">
 <head>
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <!-- Optional: better font-smoothing on mac/iOS -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>GearMatrix Pro — Web</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>GearMatrix Pro — Responsive Template (Drop-in)</title>
+  <style>
+    /* ---------- Base / reset ---------- */
+    :root{ --max-w:1200px; --gap:1rem; --radius:10px; --bg:#f4f6f8; }
+    *{box-sizing:border-box;}
+    html{font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial; font-size:16px; -webkit-text-size-adjust:100%;}
+    body{margin:0;background:var(--bg);color:#111;line-height:1.4;}
+    a{color:inherit;text-decoration:none;}
+    button{font:inherit}
 
+    /* ---------- layout ---------- */
+    .app-wrapper{max-width:var(--max-w);margin:0 auto;padding:0 1rem;display:flex;flex-direction:column;min-height:100vh;}
+    .header{display:flex;align-items:center;justify-content:space-between;padding:.8rem 0;gap:.5rem}
+    .brand{display:flex;align-items:center;gap:.6rem}
+    .brand h1{font-size:1rem;margin:0}
+    .btn{background:#0b5fff;color:#fff;border:none;padding:.45rem .85rem;border-radius:8px;min-height:44px;cursor:pointer;display:inline-flex;align-items:center;gap:.5rem}
+    .icon-btn{background:transparent;border:1px solid rgba(0,0,0,.06);padding:.45rem .6rem;border-radius:8px;min-height:44px;cursor:pointer}
 
-  <!-- Chart.js + zoom plugin + jsPDF -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.2.1/dist/chartjs-plugin-zoom.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    /* mobile overlay & sidebar */
+    .mobile-overlay{position:fixed;inset:0;display:none;background:rgba(0,0,0,.28);z-index:50;pointer-events:none}
+    .mobile-overlay.show{display:block;pointer-events:auto}
+    .layout{display:flex;flex-direction:column;gap:1rem}
+    .sidebar{
+      position:fixed;left:0;top:0;bottom:0;width:280px;transform:translateX(-110%);transition:transform .28s ease;z-index:60;
+      background:#fff;padding:1rem;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:2px 0 18px rgba(0,0,0,.06);
+    }
+    .sidebar.open{transform:translateX(0)}
+    .sidebar nav a{display:block;padding:.6rem .5rem;border-radius:8px;margin-bottom:.25rem;}
+    .sidebar nav a:hover{background:rgba(11,95,255,0.06)}
+    .content{width:100%;padding-bottom:2rem}
 
-  <link rel="stylesheet" href="style.css" />
+    /* cards & sections */
+    .card{background:#fff;border-radius:12px;padding:1rem;margin-bottom:1rem;box-shadow:0 6px 22px rgba(14,30,37,.05)}
+    .section{padding:.5rem 0;display:block}
+    .section .title{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+    .section .body{padding-top:.6rem}
+
+    /* chart placeholder */
+    .chart-wrap{width:100%;height:300px;border-radius:8px;background:linear-gradient(180deg,#eef3ff,#fff);display:flex;align-items:center;justify-content:center;color:#6b7280}
+
+    /* quick utility */
+    .overflow-x-auto{overflow-x:auto}
+    .muted{color:#666;font-size:.95rem}
+    .hidden-sm{display:inline-block}
+
+    /* desktop/tablet layout */
+    @media(min-width:700px){
+      .app-wrapper{padding:1.2rem}
+      .main-grid{display:grid;grid-template-columns:320px 1fr;gap:1rem;align-items:start}
+      .sidebar{position:relative;transform:none;box-shadow:none;display:block}
+      .mobile-overlay{display:none !important;pointer-events:none !important}
+    }
+    @media(min-width:1000px){
+      :root{--max-w:1400px}
+      .brand h1{font-size:1.15rem}
+      .chart-wrap{height:420px}
+    }
+
+    /* make sure interactive elements accept clicks */
+    .sidebar *, .card *, button, a { pointer-events:auto; }
+
+    /* temporary debug helper (remove later) */
+    .debug-hitbox{outline:3px dashed rgba(255,0,0,.6);background:rgba(255,0,0,.02)}
+  </style>
 </head>
 <body>
-  <!-- Header -->
-  <header class="header">
-    <div class="header-left">
-      <div class="logo-wrap">
-        <!-- animated gear SVG -->
-        <svg id="logo-gear" viewBox="0 0 100 100" width="44" height="44" class="gear-anim">
-          <g transform="translate(50,50)">
-            <path fill="#fff" d="M0,-28 L5,-22 L12,-20 L18,-22 L24,-16 L22,-10 L28,-5 L28,5 L22,10 L24,16 L18,22 L12,20 L5,22 L0,28 L-5,22 L-12,20 L-18,22 L-24,16 L-22,10 L-28,5 L-28,-5 L-22,-10 L-24,-16 L-18,-22 L-12,-20 L-5,-22 Z" />
-            <circle r="10" fill="#38bdf8"/>
-            <circle r="5" fill="#fff"/>
-          </g>
-        </svg>
+  <div class="mobile-overlay" id="mobileOverlay" aria-hidden="true"></div>
+
+  <div class="app-wrapper" id="app">
+    <header class="header">
+      <div class="brand">
+        <button id="hamburgerBtn" class="icon-btn" aria-label="Open menu">☰</button>
+        <h1>GearMatrix Pro</h1>
+        <span class="muted hidden-sm"> • responsive test build</span>
       </div>
-      <h1>GearMatrix Pro</h1>
-    </div>
-
-    <div class="header-right">
-      <button id="themeToggle" class="btn small">Toggle Theme</button>
-      <button id="openLogin" class="btn small">Login</button>
-      <button id="hamburgerBtn" class="btn" aria-label="menu">☰</button>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <meta name="apple-mobile-web-app-capable" content="yes">
-
-    </div>
-  </header>
-
-  <!-- Layout: sidebar + main -->
-  <div class="app">
-    <aside class="sidebar">
-      <nav>
-        <ul>
-          <li class="active" data-view="designer">Designer</li>
-          <li data-view="diagram">Diagram</li>
-          <li data-view="saved">Saved Sets</li>
-          <li id="help-tab" class="nav-item">Help</li>
-          <li data-view="about">About</li>
-          
-        </ul>
-      </nav>
-      <div class="sidebar-footer">
-        <button id="exportCsv" class="btn tiny">Export CSV</button>
-        <button id="exportPdf" class="btn tiny">Export PDF</button>
+      <div class="actions">
+        <button id="btnSave" class="btn">Save</button>
       </div>
-    </aside>
+    </header>
 
-    <main class="main">
-      <!-- Designer view -->
-      <section id="designer" class="view">
-        <div class="row">
-          <div class="col card">
-            <h2>Input Parameters</h2>
-            <div class="form-grid">
-              <label>Input RPM <input id="rpm" value="1000"></label>
-              <label>Input Torque <input id="torque" value="10"></label>
-              <label>Length Unit
-                <select id="unit">
-                  <option>mm</option><option>cm</option><option>m</option><option>inch</option>
-                </select>
-              </label>
-              <label>Torque Unit
-                <select id="torqueUnit"><option>Nm</option><option>kgm</option><option>lbf-ft</option></select>
-              </label>
-            </div>
+    <div class="layout main-grid" id="mainGrid">
+      <!-- SIDEBAR -->
+      <aside class="sidebar" id="sidebar" aria-hidden="false" role="navigation">
+        <nav>
+          <a href="#calc" class="nav-link">Calculator</a>
+          <a href="#saved" class="nav-link">Saved Sets</a>
+          <a href="#charts" class="nav-link">Charts</a>
+          <a href="#about" class="nav-link">About</a>
+        </nav>
+      </aside>
 
-            <div class="actions">
-              <button id="addGear" class="btn primary">+ Add Gear</button>
-              <button id="calcBtn" class="btn accent">Calculate</button>
-              <button id="saveSet" class="btn">Save Set</button>
-              <button id="listSets" class="btn">List Saved</button>
-            </div>
-
-            <h3 style="margin-top:18px;">Gears</h3>
-            <div id="gears"></div>
+      <!-- CONTENT -->
+      <main class="content" id="content">
+        <section id="calc" class="card section">
+          <div class="title">
+            <strong>Gear Calculator</strong>
+            <div><small class="muted">interactive</small></div>
           </div>
-
-          <div class="col card">
-            <h2>Results</h2>
-            <pre id="resultText" class="result-box">No calculation yet</pre>
-
-            <h3 style="margin-top:12px;">RPM & Torque</h3>
-            <canvas id="chart"></canvas>
+          <div class="body">
+            <label for="numGears" class="muted">Number of gears</label>
+            <input id="numGears" type="number" min="1" value="4" style="width:100%;padding:.5rem;margin-top:.4rem;border-radius:8px;border:1px solid #e6e9ef"/>
+            <div style="margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap">
+              <button id="calcBtn" class="btn">Calculate</button>
+              <button id="resetBtn" class="icon-btn">Reset</button>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- Diagram view -->
-      <section id="diagram" class="view hidden">
-        <div class="card">
-          <h2>2D Gear Diagram</h2>
-          <div id="diagramArea" class="diagram-area"></div>
-        </div>
-      </section>
+        <section id="saved" class="card section">
+          <div class="title"><strong>Saved Sets</strong><span class="muted"> (demo)</span></div>
+          <div class="body">
+            <div id="savedList" class="muted">No saved sets yet — use Save.</div>
+          </div>
+        </section>
 
-      <!-- Saved sets -->
-      <section id="saved" class="view hidden">
-        <div class="card">
-          <h2>Saved Gear Sets</h2>
-          <div id="savedList">(Click "List Saved" to load)</div>
-        </div>
-      </section>
+        <section id="charts" class="card section">
+          <div class="title"><strong>Charts</strong><span class="muted"> responsive</span></div>
+          <div class="body">
+            <div class="chart-wrap" id="chartWrap">Chart placeholder — attach Chart.js here</div>
+          </div>
+        </section>
 
-      <!-- About -->
-      <section id="about" class="view hidden">
-        <div class="card">
-          <h2>About GearMatrix Pro</h2>
-          <p>GearMatrix Pro is a streamlined engineering toolkit designed to simplify the analysis of multi-stage gear systems.
-            It allows users to model complex gear trains, visualize relationships, and compute RPM, torque flow, and transmission ratios with ease.
-            Whether you're experimenting with spur, helical, bevel, or internal gears, the interface helps you build each stage step-by-step and instantly check 
-            if the configuration is mechanically valid—catching issues like cycles, impossible connections, or inconsistent parameters.
-            Engineered for students, hobbyists, and professionals, GearMatrix Pro turns what is usually a manual, error-prone calculation process into a fast, interactive experience.
-            With features like preset examples, saved sets, automatic ratio evaluation, and export options (CSV/PDF), it acts as a compact digital companion for designing, testing, and understanding real-world gear systems.
-          </p>
-        </div>
-
-      </section>
-    </main>
-  </div>
-
-  <!-- Login Modal (simple mock) -->
-  <div id="loginModal" class="modal hidden">
-    <div class="modal-card">
-      <h3>Sign In</h3>
-      <label>User <input id="loginUser"></label>
-      <label>Password <input id="loginPass" type="password"></label>
-      <div style="text-align:right;margin-top:10px;">
-        <button id="loginCancel" class="btn">Cancel</button>
-        <button id="loginSubmit" class="btn primary">Sign In</button>
-      </div>
+        <section id="about" class="card section">
+          <div class="title"><strong>About</strong></div>
+          <div class="body muted">This template is mobile-first, fixes overlay/z-index/pointer-events issues, and keeps sections clickable on all devices.</div>
+        </section>
+      </main>
     </div>
   </div>
-  <div id="help-section" class="page-section" style="display:none;">
-    <!-- Help content will load here -->
-  </div>
-  <script src="app.js"></script>
+
+  <script id="app-js">
+    // ---------- Robust sidebar + overlay logic ----------
+    (function(){
+      const sidebar = document.getElementById('sidebar');
+      const hb = document.getElementById('hamburgerBtn');
+      const overlay = document.getElementById('mobileOverlay');
+
+      // Safety: ensure only one overlay exists
+      document.querySelectorAll('.mobile-overlay').forEach((el,i)=>{ if(i>0) el.remove(); });
+
+      function openSidebar(){
+        sidebar.classList.add('open');
+        overlay.classList.add('show');
+        overlay.setAttribute('aria-hidden','false');
+        document.body.style.overflow = 'hidden';
+        // ensure z-order
+        overlay.style.zIndex = '50';
+        sidebar.style.zIndex = '60';
+      }
+      function closeSidebar(){
+        sidebar.classList.remove('open');
+        overlay.classList.remove('show');
+        overlay.setAttribute('aria-hidden','true');
+        document.body.style.overflow = '';
+      }
+
+      hb.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        if(sidebar.classList.contains('open')) closeSidebar();
+        else openSidebar();
+      });
+
+      overlay.addEventListener('click', ()=> closeSidebar());
+      // clicking links in sidebar should keep content clickable, and close sidebar on mobile
+      sidebar.addEventListener('click', (e)=>{
+        // stop propagation to avoid overlay handling issues
+        e.stopPropagation();
+        const link = e.target.closest('a.nav-link');
+        if(link){
+          // small auto-close on small screens
+          if(window.innerWidth < 700) closeSidebar();
+        }
+      });
+
+      // close on ESC
+      document.addEventListener('keydown', (e)=> { if(e.key==='Escape') closeSidebar(); });
+
+      // Prevent overlay/blockers accidentally covering content: debugging helper (comment out when done)
+      // If nothing clickable, temporarily add this to visualize hitboxes:
+      // document.body.classList.add('debug-hitbox');
+    })();
+
+
+    // ---------- Demo: basic app behavior (so sections respond) ----------
+    (function(){
+      const calcBtn = document.getElementById('calcBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const numGears = document.getElementById('numGears');
+      const savedList = document.getElementById('savedList');
+      const btnSave = document.getElementById('btnSave');
+
+      calcBtn.addEventListener('click', ()=> {
+        const n = parseInt(numGears.value) || 0;
+        alert('Calculated for ' + n + ' gears (demo).');
+      });
+
+      resetBtn.addEventListener('click', ()=> {
+        numGears.value = 4;
+      });
+
+      btnSave.addEventListener('click', ()=>{
+        const n = numGears.value;
+        savedList.textContent = `Saved set: ${n} gears (demo) — saved at ${new Date().toLocaleTimeString()}.`;
+      });
+
+      // Ensure sections are keyboard-focusable / clickable
+      document.querySelectorAll('.section').forEach(s=>{
+        s.tabIndex = 0; // keyboard focus
+        s.addEventListener('click', ()=> {
+          s.classList.add('flash'); 
+          // small visual feedback
+          s.style.boxShadow = '0 8px 28px rgba(2,6,23,0.06)';
+          setTimeout(()=> s.style.boxShadow = '', 300);
+        });
+      });
+    })();
+
+
+    // ---------- Debug helper: find top element at click point (comment out in production) ----------
+    (function(){
+      let dbg = false; // set to true to enable debugging
+      if(!dbg) return;
+      document.addEventListener('click', function debugClick(e){
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        if(el){
+          el.classList.add('debug-hitbox');
+          setTimeout(()=> el.classList.remove('debug-hitbox'), 1200);
+          console.log('Top element at click', el, el.tagName, el.className);
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
