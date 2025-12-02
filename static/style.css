@@ -153,4 +153,109 @@ input,select{padding:10px;border-radius:8px;border:1px solid #e6eef6;background:
 
 /* small copy hint */
 .help-root .hint { font-size:13px; color:#5b6b7a; }
+/* ========== Responsive container ========== */
+:root{
+  --max-content-width: 1200px;
+  --gutter: 1rem;
+  --base-font: 16px;
+  --radius: 10px;
+}
+
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+body { margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; line-height:1.45; }
+
+/* page wrapper */
+.app-wrapper {
+  box-sizing: border-box;
+  padding: calc(var(--gutter) * 1);
+  width: 100%;
+  margin: 0 auto;
+  max-width: var(--max-content-width);
+}
+
+/* common responsive images & canvas */
+img, svg, canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* fluid cards */
+.card {
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  background: white;
+  margin-bottom: 1rem;
+}
+
+/* typography scale — use rems for easy scaling */
+h1 { font-size: 1.4rem; margin: .35rem 0; }
+h2 { font-size: 1.15rem; margin: .35rem 0; }
+p, label, input, button { font-size: 1rem; }
+
+/* touch-friendly controls */
+button, .btn {
+  min-height: 44px; /* recommended touch target */
+  padding: .6rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* utility flex layout for small screens (single column) */
+.row { display: flex; gap: .75rem; flex-direction: column; }
+.col { flex: 1; }
+
+/* Sidebar & content (mobile-first: sidebar hidden by default) */
+.sidebar {
+  display: none;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 260px;
+  background: #fff;
+  z-index: 50;
+  box-shadow: 2px 0 18px rgba(0,0,0,0.08);
+  transform: translateX(-110%);
+  transition: transform .28s ease;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.sidebar.open { transform: translateX(0); }
+
+/* content area when sidebar exists */
+.content {
+  width: 100%;
+}
+
+/* small header with hamburger */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  padding: .5rem 0;
+}
+
+/* charts / canvas responsive container */
+.chart-wrap { width: 100%; height: auto; }
+
+/* ========== MEDIA QUERIES: tablets & desktop ========== */
+@media (min-width: 700px) {
+  .row { flex-direction: row; }
+  .sidebar { display: block; position: relative; transform: none; width: 320px; box-shadow: none; }
+  .sidebar.open { transform: none; }
+  /* when sidebar visible on larger screens, make layout grid */
+  .layout-grid { display: grid; grid-template-columns: 320px 1fr; gap: 1rem; align-items: start; }
+  .app-header { padding: 1rem 0; }
+}
+
+@media (min-width: 1000px) {
+  :root { --max-content-width: 1400px; }
+  h1 { font-size: 1.8rem; }
+}
+.chart-wrap { width: 100%; height: 300px; } /* small screens */
+@media(min-width:700px){ .chart-wrap{ height: 420px; } }
+
 
