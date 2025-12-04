@@ -458,3 +458,163 @@
   };
 
 })();
+/* ---------- Gear add hotfix: robust addGear + binding ---------- */
+/* Append this at end of static/app.js and redeploy (or paste in Console to test). */
+
+(function () {
+  // small utility for logging
+  function gm_log(...args) { console.log("[GearMatrix]", ...args); }
+
+  // Wait for DOM ready
+  function ready(fn) {
+    if (document.readyState !== 'loading') return fn();
+    document.addEventListener('DOMContentLoaded', fn);
+  }
+
+  ready(function () {
+    gm_log("Add-gear hotfix initialising...");
+
+    // find add button (try common IDs or text)
+    var addBtn = document.querySelector('[data-action="add-gear"], #add-gear, .add-gear, button#addGear') ||
+                 Array.from(document.querySelectorAll('button')).find(b => /add\s*gear/i.test(b.textContent));
+
+    if (!addBtn) {
+      gm_log("Add button not found by standard selectors. Please confirm button text or id.");
+      return;
+    }
+    gm_log("Add button found:", addBtn);
+
+    // target container where new gear rows should be appended
+    // try common containers used by GearMatrix: look for #gearList, .gear-list, #gears
+    var gearContainer = document.querySelector('#gearList') ||
+                        document.querySelector('.gear-list') ||
+                        document.querySelector('#gears') ||
+                        document.querySelector('#gear-container') ||
+                        document.querySelector('.gears');
+
+    // fallback: try to place after the Gear Configuration form
+    if (!gearContainer) {
+      var form = document.querySelector('form') || document.querySelector('.gear-config') || document.querySelector('section.gear-config');
+      if (form) {
+        // create container and insert after form
+        gearContainer = document.createElement('div');
+        gearContainer.id = 'gearList';
+        form.parentNode.insertBefore(gearContainer, form.nextSibling);
+        gm_log("Created fallback gear container (#gearList).");
+      } else {
+        // final fallback: append to body
+        gearContainer = document.body;
+        gm_log("Using document.body as gear container (last resort).");
+      }
+    } else {
+      gm_log("Gear container found:", gearContainer);
+    }
+
+    // function to create a new gear card (simple)
+    function createGearCard(index, values) {
+      var card = document.createElement('div');
+      card.className = 'gm-gear-card';
+      card.dataset.index = index;
+      card.style.border = '1px solid #d6eaf3';
+      card.style.padding = '10px';
+      card.style.margin = '8px 0';
+      card.style.borderRadius = '8px';
+      card.style.background = '#ffffff';
+
+      var title = document.createElement('div');
+      title.innerHTML = '<strong>Gear ' + index + '</strong>';
+      card.appendChild(title);
+
+      var content = document.createElement('pre');
+      content.style.whiteSpace = 'pre-wrap';
+      content.style.margin = '8px 0';
+      content.textContent = JSON.stringify(values || {teeth: values?.teeth || 20, module: values?.module || 2}, null, 2);
+      card.appendChild(content);
+
+      var edit = document.createElement('button');
+      edit.textContent = 'Edit';
+      edit.style.marginRight = '6px';
+      edit.onclick = function () {
+        var newTeeth = prompt("Teeth (z):", values?.teeth || 20);
+        if (newTeeth !== null) {
+          values = values || {};
+          values.teeth = parseInt(newTeeth, 10) || values.teeth;
+          content.textContent = JSON.stringify(values, null, 2);
+        }
+      };
+      card.appendChild(edit);
+
+      var remove = document.createElement('button');
+      remove.textContent = 'Remove';
+      remove.onclick = function () {
+        if (confirm("Remove this gear?")) {
+          card.remove();
+          gm_log("Removed gear", index);
+        }
+      };
+      card.appendChild(remove);
+
+      return card;
+    }
+
+    // counter for gear index
+    var gearIndex = document.querySelectorAll('.gm-gear-card').length + 1;
+
+    // the canonical addGear handler (uses form fields if present)
+    function addGearHandler(ev) {
+      ev && ev.preventDefault && ev.preventDefault();
+      gm_log("addGear clicked. Current gearIndex:", gearIndex);
+
+      // try to read form inputs (robust selectors)
+      var getVal = function (selector) {
+        var el = document.querySelector(selector);
+        return el ? el.value : null;
+      };
+
+      var values = {};
+      // common names used in GearMatrix forms
+      values.module = getVal('input[name="module"], input#module, input[name*="module"]') || getVal('input[placeholder*="module"]') || 2;
+      values.teeth = getVal('input[name="teeth"], input#teeth, input[name*="teeth"]') || 20;
+      values.pitch = getVal('input[name="pitch"], input#pitch') || getVal('input[name*="pitch"]') || null;
+      values.pressure = getVal('select[name="pressure_angle"], select#pressure_angle') || 20;
+      values.inputRPM = getVal('input[name="input_rpm"], input#input_rpm') || getVal('input[name*="rpm"]') || 1000;
+
+      // coerce numeric
+      values.module = parseFloat(values.module) || 2;
+      values.teeth = parseInt(values.teeth, 10) || 20;
+      values.inputRPM = parseFloat(values.inputRPM) || 1000;
+
+      // create UI card and append
+      var card = createGearCard(gearIndex, values);
+      gearContainer.appendChild(card);
+      gm_log("Added gear", gearIndex, values);
+
+      // increment index
+      gearIndex++;
+
+      // optionally call existing app logic if present (safe guard)
+      try {
+        if (typeof window.handleGearAdded === 'function') {
+          window.handleGearAdded(values, gearIndex - 1);
+          gm_log("Called existing handleGearAdded hook.");
+        } else if (typeof window.onGearAdded === 'function') {
+          window.onGearAdded(values, gearIndex - 1);
+          gm_log("Called existing onGearAdded hook.");
+        }
+      } catch (err) {
+        console.error("[GearMatrix] error calling existing hook:", err);
+      }
+    }
+
+    // ensure we don't bind twice
+    addBtn.removeEventListener('click', addGearHandler);
+    addBtn.addEventListener('click', addGearHandler, {once: false});
+    addBtn.dataset.gmBound = '1';
+    gm_log("Add button bound to addGearHandler. You may now click Add Gear.");
+
+    // expose function for console testing
+    window.gearmatrix_addGear = addGearHandler;
+    gm_log("Console helper available as window.gearmatrix_addGear()");
+  });
+})();
+
