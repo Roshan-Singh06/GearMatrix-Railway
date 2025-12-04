@@ -1,57 +1,55 @@
 # app.py
-# Robust Flask server: serves index.html from repo root or static/index.html (fallback),
-# preserves plotting endpoints and adds health + debug listing for deployment debugging.
-#
-# WARNING: remove /__listfiles in production if you do not want a public file list.
-
-from flask import Flask, request, jsonify, send_from_directory, abort, send_file
+# Serve index from static/html and static assets from static/
+from flask import Flask, send_from_directory, jsonify, request, abort, send_file
 import os, json, datetime, io, traceback, logging
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib import animation
-from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 from PIL import Image
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("gearmatrix")
 
-# Serve static files from repo root
+# serve static files from project root (Flask will still serve /static/ folder)
 app = Flask(__name__, static_folder='.', static_url_path='')
 
 SAVE_DIR = os.environ.get('SAVED_DIR', 'saved_configs')
 os.makedirs(SAVE_DIR, exist_ok=True)
 
-# ---------- Serve main UI (root) ----------
+# Serve main UI from static/html/index.html
 @app.route('/')
 def index():
-    # preferred: repo root index.html
+    path_root = os.path.join('static', 'html', 'index.html')
+    if os.path.exists(path_root):
+        log.info("Serving static/html/index.html")
+        return send_from_directory(os.path.join('static', 'html'), 'index.html')
+    # fallback to repo root index.html
     if os.path.exists('index.html'):
         log.info("Serving index.html from repo root")
         return send_from_directory('.', 'index.html')
-    # fallback: static/index.html
-    if os.path.exists(os.path.join('static', 'index.html')):
-        log.info("Serving static/index.html (fallback)")
-        return send_from_directory('static', 'index.html')
-    log.error("index.html not found at repo root or static/")
-    return ("index.html not found in repository root nor static/ folder. "
-            "Ensure index.html is committed to the branch deployed."), 500
+    log.error("index.html not found (static/html/index.html or repo root)")
+    return ("index.html not found. Ensure static/html/index.html or repo root index.html is present."), 500
 
-# ---------- static file fallback route ----------
+# Serve any file requested; first try static/ folder then repo root
 @app.route('/<path:filename>')
-def static_files(filename):
-    safe = os.path.join(os.getcwd(), filename)
-    if not os.path.exists(safe):
-        # try static/ folder as fallback
-        static_path = os.path.join('static', filename)
-        if os.path.exists(static_path):
-            return send_from_directory('static', filename)
-        log.warning(f"File not found: {filename}")
-        abort(404)
-    return send_from_directory('.', filename)
+def serve_file_anywhere(filename):
+    # If file exists under static/ (eg static/css/style.css), serve that
+    static_path = os.path.join('static', filename)
+    if os.path.exists(static_path):
+        # note: send_from_directory requires dir portion and filename
+        dir_part = os.path.dirname(static_path) or '.'
+        file_name = os.path.basename(static_path)
+        return send_from_directory(dir_part, file_name)
+    # else try repo root
+    root_path = os.path.join('.', filename)
+    if os.path.exists(root_path):
+        return send_from_directory('.', filename)
+    log.warning(f"File not found: {filename}")
+    abort(404)
 
-# ---------- health & debug endpoints ----------
+# health and debug
 @app.route('/health')
 def health():
     return jsonify({"status":"ok", "time": datetime.datetime.utcnow().isoformat() + "Z"})
@@ -60,18 +58,19 @@ def health():
 def list_files():
     try:
         files = []
-        for root, dirs, filenames in os.walk('.'):
-            depth = root.count(os.sep)
-            if depth > 3:
-                continue
+        for root, dirs, filenames in os.walk('static'):
             for f in filenames:
                 files.append(os.path.relpath(os.path.join(root, f)))
+        # also list top-level
+        for f in os.listdir('.'):
+            if os.path.isfile(f):
+                files.append(f)
         return jsonify({"ok": True, "files": sorted(files)})
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-# ---------- existing save / config endpoints ----------
+# Save endpoints (unchanged)
 @app.route('/save', methods=['POST'])
 def save_config():
     try:
@@ -215,7 +214,6 @@ def animate():
         traceback.print_exc()
         return jsonify({"error": "animation generation failed", "msg": str(e)}), 500
 
-# Run server
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     log.info(f"Starting server on 0.0.0.0:{port}")
