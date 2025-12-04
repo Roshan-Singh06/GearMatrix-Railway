@@ -1,10 +1,11 @@
 # app.py
-# Flask server that serves index.html, saves JSON configs and dynamically returns matplotlib plots (2D, 3D) and animated GIFs.
-# Requirements: Flask, matplotlib, numpy, pillow
-# Install: pip install -r requirements.txt
+# Robust Flask server: serves index.html from repo root or static/index.html (fallback),
+# preserves plotting endpoints and adds health + debug listing for deployment debugging.
+#
+# WARNING: remove /__listfiles in production if you do not want a public file list.
 
 from flask import Flask, request, jsonify, send_from_directory, abort, send_file
-import os, json, datetime, io, traceback
+import os, json, datetime, io, traceback, logging
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -13,15 +14,64 @@ from matplotlib import animation
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 from PIL import Image
 
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("gearmatrix")
+
+# Serve static files from repo root
 app = Flask(__name__, static_folder='.', static_url_path='')
 
-SAVE_DIR = 'saved_configs'
+SAVE_DIR = os.environ.get('SAVED_DIR', 'saved_configs')
 os.makedirs(SAVE_DIR, exist_ok=True)
 
+# ---------- Serve main UI (root) ----------
 @app.route('/')
 def index():
-    return send_from_directory('.', 'index.html')
+    # preferred: repo root index.html
+    if os.path.exists('index.html'):
+        log.info("Serving index.html from repo root")
+        return send_from_directory('.', 'index.html')
+    # fallback: static/index.html
+    if os.path.exists(os.path.join('static', 'index.html')):
+        log.info("Serving static/index.html (fallback)")
+        return send_from_directory('static', 'index.html')
+    log.error("index.html not found at repo root or static/")
+    return ("index.html not found in repository root nor static/ folder. "
+            "Ensure index.html is committed to the branch deployed."), 500
 
+# ---------- static file fallback route ----------
+@app.route('/<path:filename>')
+def static_files(filename):
+    safe = os.path.join(os.getcwd(), filename)
+    if not os.path.exists(safe):
+        # try static/ folder as fallback
+        static_path = os.path.join('static', filename)
+        if os.path.exists(static_path):
+            return send_from_directory('static', filename)
+        log.warning(f"File not found: {filename}")
+        abort(404)
+    return send_from_directory('.', filename)
+
+# ---------- health & debug endpoints ----------
+@app.route('/health')
+def health():
+    return jsonify({"status":"ok", "time": datetime.datetime.utcnow().isoformat() + "Z"})
+
+@app.route('/__listfiles', methods=['GET'])
+def list_files():
+    try:
+        files = []
+        for root, dirs, filenames in os.walk('.'):
+            depth = root.count(os.sep)
+            if depth > 3:
+                continue
+            for f in filenames:
+                files.append(os.path.relpath(os.path.join(root, f)))
+        return jsonify({"ok": True, "files": sorted(files)})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# ---------- existing save / config endpoints ----------
 @app.route('/save', methods=['POST'])
 def save_config():
     try:
@@ -33,6 +83,7 @@ def save_config():
     path = os.path.join(SAVE_DIR, filename)
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(payload, f, indent=2)
+    log.info(f"Saved config: {path}")
     return jsonify({"ok": True, "filename": filename})
 
 @app.route('/configs', methods=['GET'])
@@ -53,7 +104,7 @@ def get_config(filename):
     return send_from_directory(SAVE_DIR, filename, as_attachment=True)
 
 # ---------------------------
-# Matplotlib endpoints
+# Matplotlib endpoints (unchanged)
 # ---------------------------
 def _png_bytes_from_figure(fig):
     buf = io.BytesIO()
@@ -78,11 +129,8 @@ def plot2d():
 
         fig, ax = plt.subplots(figsize=(7,4))
         ax.plot(x, y, linestyle=ls, marker=(marker if marker else None), linewidth=2)
-        ax.set_title(title)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
+        ax.set_title(title); ax.set_xlabel(xlabel); ax.set_ylabel(ylabel)
         ax.grid(True, linestyle='--', alpha=0.4)
-
         buf = _png_bytes_from_figure(fig)
         return send_file(buf, mimetype='image/png', download_name='plot2d.png')
     except Exception as e:
@@ -103,10 +151,8 @@ def plot3d():
         fig = plt.figure(figsize=(7,5))
         ax = fig.add_subplot(111, projection='3d')
         ax.plot(x, y, z, linewidth=2)
-        ax.set_title(title)
-        ax.set_xlabel('X'); ax.set_ylabel('Y'); ax.set_zlabel('Z')
+        ax.set_title(title); ax.set_xlabel('X'); ax.set_ylabel('Y'); ax.set_zlabel('Z')
         ax.view_init(elev=25, azim=-60)
-
         buf = _png_bytes_from_figure(fig)
         return send_file(buf, mimetype='image/png', download_name='plot3d.png')
     except Exception as e:
@@ -126,27 +172,23 @@ def animate():
 
         x = np.linspace(float(xr[0]), float(xr[1]), points)
         fig, ax = plt.subplots(figsize=(7,3))
-        ax.set_xlim(x.min(), x.max())
-        ax.set_ylim(-1.5 * amp, 1.5 * amp)
+        ax.set_xlim(x.min(), x.max()); ax.set_ylim(-1.5 * amp, 1.5 * amp)
         ax.set_xlabel('x'); ax.set_ylabel('y'); ax.set_title('Animated plot')
         line, = ax.plot([], [], lw=2)
 
         def init():
-            line.set_data([], [])
-            return (line,)
+            line.set_data([], []); return (line,)
 
         if anim_type == 'sine':
             def update(frame):
                 phase = 2 * np.pi * (frame / frames) * freq
                 y = amp * np.sin(x + phase)
-                line.set_data(x, y)
-                return (line,)
+                line.set_data(x, y); return (line,)
         else:
             def update(frame):
                 shift = (frame / frames) * (x.max() - x.min())
                 y = amp * np.exp(-((x - (x.min() + shift))**2) / (0.1 + 0.05 * points))
-                line.set_data(x, y)
-                return (line,)
+                line.set_data(x, y); return (line,)
 
         anim = animation.FuncAnimation(fig, update, init_func=init, frames=frames, blit=True)
         buf = io.BytesIO()
@@ -175,4 +217,6 @@ def animate():
 
 # Run server
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    port = int(os.environ.get('PORT', 5000))
+    log.info(f"Starting server on 0.0.0.0:{port}")
+    app.run(debug=True, host='0.0.0.0', port=port)
