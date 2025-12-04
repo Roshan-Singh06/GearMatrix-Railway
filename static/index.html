@@ -2,239 +2,167 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <title>GearMatrix Pro — Responsive Template (Drop-in)</title>
-  <style>
-    /* ---------- Base / reset ---------- */
-    :root{ --max-w:1200px; --gap:1rem; --radius:10px; --bg:#f4f6f8; }
-    *{box-sizing:border-box;}
-    html{font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial; font-size:16px; -webkit-text-size-adjust:100%;}
-    body{margin:0;background:var(--bg);color:#111;line-height:1.4;}
-    a{color:inherit;text-decoration:none;}
-    button{font:inherit}
-
-    /* ---------- layout ---------- */
-    .app-wrapper{max-width:var(--max-w);margin:0 auto;padding:0 1rem;display:flex;flex-direction:column;min-height:100vh;}
-    .header{display:flex;align-items:center;justify-content:space-between;padding:.8rem 0;gap:.5rem}
-    .brand{display:flex;align-items:center;gap:.6rem}
-    .brand h1{font-size:1rem;margin:0}
-    .btn{background:#0b5fff;color:#fff;border:none;padding:.45rem .85rem;border-radius:8px;min-height:44px;cursor:pointer;display:inline-flex;align-items:center;gap:.5rem}
-    .icon-btn{background:transparent;border:1px solid rgba(0,0,0,.06);padding:.45rem .6rem;border-radius:8px;min-height:44px;cursor:pointer}
-
-    /* mobile overlay & sidebar */
-    .mobile-overlay{position:fixed;inset:0;display:none;background:rgba(0,0,0,.28);z-index:50;pointer-events:none}
-    .mobile-overlay.show{display:block;pointer-events:auto}
-    .layout{display:flex;flex-direction:column;gap:1rem}
-    .sidebar{
-      position:fixed;left:0;top:0;bottom:0;width:280px;transform:translateX(-110%);transition:transform .28s ease;z-index:60;
-      background:#fff;padding:1rem;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:2px 0 18px rgba(0,0,0,.06);
-    }
-    .sidebar.open{transform:translateX(0)}
-    .sidebar nav a{display:block;padding:.6rem .5rem;border-radius:8px;margin-bottom:.25rem;}
-    .sidebar nav a:hover{background:rgba(11,95,255,0.06)}
-    .content{width:100%;padding-bottom:2rem}
-
-    /* cards & sections */
-    .card{background:#fff;border-radius:12px;padding:1rem;margin-bottom:1rem;box-shadow:0 6px 22px rgba(14,30,37,.05)}
-    .section{padding:.5rem 0;display:block}
-    .section .title{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
-    .section .body{padding-top:.6rem}
-
-    /* chart placeholder */
-    .chart-wrap{width:100%;height:300px;border-radius:8px;background:linear-gradient(180deg,#eef3ff,#fff);display:flex;align-items:center;justify-content:center;color:#6b7280}
-
-    /* quick utility */
-    .overflow-x-auto{overflow-x:auto}
-    .muted{color:#666;font-size:.95rem}
-    .hidden-sm{display:inline-block}
-
-    /* desktop/tablet layout */
-    @media(min-width:700px){
-      .app-wrapper{padding:1.2rem}
-      .main-grid{display:grid;grid-template-columns:320px 1fr;gap:1rem;align-items:start}
-      .sidebar{position:relative;transform:none;box-shadow:none;display:block}
-      .mobile-overlay{display:none !important;pointer-events:none !important}
-    }
-    @media(min-width:1000px){
-      :root{--max-w:1400px}
-      .brand h1{font-size:1.15rem}
-      .chart-wrap{height:420px}
-    }
-
-    /* make sure interactive elements accept clicks */
-    .sidebar *, .card *, button, a { pointer-events:auto; }
-
-    /* temporary debug helper (remove later) */
-    .debug-hitbox{outline:3px dashed rgba(255,0,0,.6);background:rgba(255,0,0,.02)}
-  </style>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GearMatrix Pro v2 — Professional</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="mobile-overlay" id="mobileOverlay" aria-hidden="true"></div>
-
-  <div class="app-wrapper" id="app">
-    <header class="header">
-      <div class="brand">
-        <button id="hamburgerBtn" class="icon-btn" aria-label="Open menu">☰</button>
-        <h1>GearMatrix Pro</h1>
-        <span class="muted hidden-sm"> • responsive test build</span>
+  <!-- STARTUP MODAL -->
+  <div id="startupModal" class="modal">
+    <div class="modal-card">
+      <h1>GearMatrix Pro — Select Library Level</h1>
+      <p class="lead">Choose how comprehensive the gear library should be. You can change this later in Settings.</p>
+      <div class="options">
+        <button class="choice" data-choice="A"><strong>Option A</strong><br><small>Standard Engineering Library — recommended</small></button>
+        <button class="choice" data-choice="B"><strong>Option B</strong><br><small>Comprehensive Library — more gear families</small></button>
+        <button class="choice" data-choice="C"><strong>Option C</strong><br><small>Hyper-complete / Research (heavy)</small></button>
       </div>
-      <div class="actions">
-        <button id="btnSave" class="btn">Save</button>
-      </div>
-    </header>
-
-    <div class="layout main-grid" id="mainGrid">
-      <!-- SIDEBAR -->
-      <aside class="sidebar" id="sidebar" aria-hidden="false" role="navigation">
-        <nav>
-          <a href="#calc" class="nav-link">Calculator</a>
-          <a href="#saved" class="nav-link">Saved Sets</a>
-          <a href="#charts" class="nav-link">Charts</a>
-          <a href="#about" class="nav-link">About</a>
-        </nav>
-      </aside>
-
-      <!-- CONTENT -->
-      <main class="content" id="content">
-        <section id="calc" class="card section">
-          <div class="title">
-            <strong>Gear Calculator</strong>
-            <div><small class="muted">interactive</small></div>
-          </div>
-          <div class="body">
-            <label for="numGears" class="muted">Number of gears</label>
-            <input id="numGears" type="number" min="1" value="4" style="width:100%;padding:.5rem;margin-top:.4rem;border-radius:8px;border:1px solid #e6e9ef"/>
-            <div style="margin-top:.6rem;display:flex;gap:.5rem;flex-wrap:wrap">
-              <button id="calcBtn" class="btn">Calculate</button>
-              <button id="resetBtn" class="icon-btn">Reset</button>
-            </div>
-          </div>
-        </section>
-
-        <section id="saved" class="card section">
-          <div class="title"><strong>Saved Sets</strong><span class="muted"> (demo)</span></div>
-          <div class="body">
-            <div id="savedList" class="muted">No saved sets yet — use Save.</div>
-          </div>
-        </section>
-
-        <section id="charts" class="card section">
-          <div class="title"><strong>Charts</strong><span class="muted"> responsive</span></div>
-          <div class="body">
-            <div class="chart-wrap" id="chartWrap">Chart placeholder — attach Chart.js here</div>
-          </div>
-        </section>
-
-        <section id="about" class="card section">
-          <div class="title"><strong>About</strong></div>
-          <div class="body muted">This template is mobile-first, fixes overlay/z-index/pointer-events issues, and keeps sections clickable on all devices.</div>
-        </section>
-      </main>
+      <div class="hint">Tip: Start with <strong>A</strong> and switch to <strong>B</strong> or <strong>C</strong> when you need advanced types.</div>
     </div>
   </div>
 
-  <script id="app-js">
-    // ---------- Robust sidebar + overlay logic ----------
-    (function(){
-      const sidebar = document.getElementById('sidebar');
-      const hb = document.getElementById('hamburgerBtn');
-      const overlay = document.getElementById('mobileOverlay');
+  <div class="app" id="appRoot" aria-hidden="true">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">GearMatrix Pro</div>
+      <nav>
+        <button data-section="calculator" class="active">Calculator</button>
+        <button data-section="saved">Saved Configurations</button>
+        <button data-section="guide">Guide</button>
+        <button data-section="about">About</button>
+        <button id="settingsBtn">Settings</button>
+      </nav>
+      <div class="sidebar-footer">
+        <small id="libraryLabel">Library: (not selected)</small>
+      </div>
+    </aside>
 
-      // Safety: ensure only one overlay exists
-      document.querySelectorAll('.mobile-overlay').forEach((el,i)=>{ if(i>0) el.remove(); });
+    <!-- Main -->
+    <main class="main">
+      <header class="mobile-header">
+        <div class="brand">GearMatrix Pro</div>
+        <button id="mobileMenuBtn">☰</button>
+      </header>
 
-      function openSidebar(){
-        sidebar.classList.add('open');
-        overlay.classList.add('show');
-        overlay.setAttribute('aria-hidden','false');
-        document.body.style.overflow = 'hidden';
-        // ensure z-order
-        overlay.style.zIndex = '50';
-        sidebar.style.zIndex = '60';
-      }
-      function closeSidebar(){
-        sidebar.classList.remove('open');
-        overlay.classList.remove('show');
-        overlay.setAttribute('aria-hidden','true');
-        document.body.style.overflow = '';
-      }
+      <!-- CALCULATOR -->
+      <section id="calculator" class="section active">
+        <div class="panel form-panel">
+          <h2>Gear Configuration</h2>
 
-      hb.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        if(sidebar.classList.contains('open')) closeSidebar();
-        else openSidebar();
-      });
+          <div class="row">
+            <div style="flex:1">
+              <label>Gear Type</label>
+              <select id="gearTypeSelect"></select>
+            </div>
+            <div style="width:120px">
+              <label>Module (mm)</label>
+              <input id="moduleInput" type="number" min="0.01" step="0.01" value="2">
+            </div>
+            <div style="width:120px">
+              <label>Teeth (z)</label>
+              <input id="teethInput" type="number" min="3" step="1" value="20">
+            </div>
+            <div style="width:140px">
+              <label>Pitch Dia (mm)</label>
+              <input id="radiusInput" type="number" min="0" step="0.01" value="40">
+            </div>
+            <div style="width:140px">
+              <label>Pressure angle (°)</label>
+              <select id="pressureAngle">
+                <option>20</option><option>14.5</option><option>25</option>
+              </select>
+            </div>
+          </div>
 
-      overlay.addEventListener('click', ()=> closeSidebar());
-      // clicking links in sidebar should keep content clickable, and close sidebar on mobile
-      sidebar.addEventListener('click', (e)=>{
-        // stop propagation to avoid overlay handling issues
-        e.stopPropagation();
-        const link = e.target.closest('a.nav-link');
-        if(link){
-          // small auto-close on small screens
-          if(window.innerWidth < 700) closeSidebar();
-        }
-      });
+          <div id="advancedRow" class="row" style="margin-top:8px">
+            <div style="width:160px">
+              <label>Helix angle β (°)</label>
+              <input id="helixAngle" type="number" step="0.1" value="0">
+            </div>
+            <div style="width:160px">
+              <label>Hand</label>
+              <select id="helixHand"><option value="RH">RH</option><option value="LH">LH</option></select>
+            </div>
+            <div style="width:160px">
+              <label>Connects to (index)</label>
+              <input id="connectsTo" type="text" placeholder="e.g., 2 or 2,3">
+            </div>
+            <div style="width:140px">
+              <label>Input RPM</label>
+              <input id="inputRPM" type="number" value="1000">
+            </div>
+            <div style="width:120px">
+              <label>Role</label>
+              <select id="gearRole"><option>External</option><option>Internal</option></select>
+            </div>
+          </div>
 
-      // close on ESC
-      document.addEventListener('keydown', (e)=> { if(e.key==='Escape') closeSidebar(); });
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button id="addGear">+ Add Gear</button>
+            <button id="calcBtn">Calculate</button>
+            <button id="saveJson">Save JSON</button>
+            <button id="saveServer">Save to Server</button>
+            <button id="uploadJson">Load JSON</button>
+            <input type="file" id="fileInput" accept="application/json" style="display:none">
+            <button id="exportCsv">Export CSV</button>
+          </div>
 
-      // Prevent overlay/blockers accidentally covering content: debugging helper (comment out when done)
-      // If nothing clickable, temporarily add this to visualize hitboxes:
-      // document.body.classList.add('debug-hitbox');
-    })();
+          <div id="validationPanel" class="validation-panel" aria-live="polite" style="margin-top:12px"></div>
+        </div>
 
+        <!-- right column: python-generated graph + results -->
+        <div class="right-column">
+          <div class="panel graph-panel">
+            <div class="panel-header">
+              <h2>Python Plot (Matplotlib)</h2>
+              <div class="gear-accent" aria-hidden></div>
+            </div>
+            <img id="plotImage" src="" alt="Plot will appear here" style="width:100%;border-radius:8px;background:#fff;border:1px solid #dfeffd;">
+          </div>
 
-    // ---------- Demo: basic app behavior (so sections respond) ----------
-    (function(){
-      const calcBtn = document.getElementById('calcBtn');
-      const resetBtn = document.getElementById('resetBtn');
-      const numGears = document.getElementById('numGears');
-      const savedList = document.getElementById('savedList');
-      const btnSave = document.getElementById('btnSave');
+          <div class="panel results-panel">
+            <div class="panel-header">
+              <h2>Results</h2>
+              <button id="copyResults" title="Copy results">Copy</button>
+            </div>
+            <pre id="resultsPre" class="results-pre">No results yet.</pre>
+          </div>
+        </div>
+      </section>
 
-      calcBtn.addEventListener('click', ()=> {
-        const n = parseInt(numGears.value) || 0;
-        alert('Calculated for ' + n + ' gears (demo).');
-      });
+      <!-- SAVED -->
+      <section id="saved" class="section">
+        <div class="panel">
+          <h2>Saved Configurations</h2>
+          <div id="savedList">No saved files.</div>
+          <div style="margin-top:8px;">
+            <button id="refreshSaved">Refresh</button>
+          </div>
+        </div>
+      </section>
 
-      resetBtn.addEventListener('click', ()=> {
-        numGears.value = 4;
-      });
+      <!-- GUIDE -->
+      <section id="guide" class="section">
+        <div class="panel">
+          <h2>Guide</h2>
+          <ol>
+            <li>Choose library level (A/B/C) at startup.</li>
+            <li>Add gears from the Professional Gear Library. Live validation blocks invalid selections.</li>
+            <li>Click Calculate to compute RPM propagation and retrieve a Matplotlib line plot from the server.</li>
+          </ol>
+        </div>
+      </section>
 
-      btnSave.addEventListener('click', ()=>{
-        const n = numGears.value;
-        savedList.textContent = `Saved set: ${n} gears (demo) — saved at ${new Date().toLocaleTimeString()}.`;
-      });
+      <!-- ABOUT -->
+      <section id="about" class="section">
+        <div class="panel">
+          <h2>About</h2>
+          <p>GearMatrix Pro — Professional gear validation and Matplotlib plotting. Uses ISO/AGMA terminology where applicable.</p>
+        </div>
+      </section>
+    </main>
+  </div>
 
-      // Ensure sections are keyboard-focusable / clickable
-      document.querySelectorAll('.section').forEach(s=>{
-        s.tabIndex = 0; // keyboard focus
-        s.addEventListener('click', ()=> {
-          s.classList.add('flash'); 
-          // small visual feedback
-          s.style.boxShadow = '0 8px 28px rgba(2,6,23,0.06)';
-          setTimeout(()=> s.style.boxShadow = '', 300);
-        });
-      });
-    })();
-
-
-    // ---------- Debug helper: find top element at click point (comment out in production) ----------
-    (function(){
-      let dbg = false; // set to true to enable debugging
-      if(!dbg) return;
-      document.addEventListener('click', function debugClick(e){
-        const el = document.elementFromPoint(e.clientX, e.clientY);
-        if(el){
-          el.classList.add('debug-hitbox');
-          setTimeout(()=> el.classList.remove('debug-hitbox'), 1200);
-          console.log('Top element at click', el, el.tagName, el.className);
-        }
-      });
-    })();
-  </script>
+  <script src="app.js"></script>
 </body>
 </html>
