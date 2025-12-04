@@ -21,10 +21,13 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 # Serve main UI from static/html/index.html
 @app.route('/')
 def index():
-    path_root = os.path.join('static', 'html', 'index.html')
-    if os.path.exists(path_root):
-        log.info("Serving static/html/index.html")
-        return send_from_directory(os.path.join('static', 'html'), 'index.html')
+    # serve static/index.html if exists (common case)
+    if os.path.exists(os.path.join('static', 'index.html')):
+        return send_from_directory('static', 'index.html')
+    if os.path.exists('index.html'):
+        return send_from_directory('.', 'index.html')
+    return ("index.html not found. Ensure static/index.html or repo root index.html is present."), 500
+
     # fallback to repo root index.html
     if os.path.exists('index.html'):
         log.info("Serving index.html from repo root")
