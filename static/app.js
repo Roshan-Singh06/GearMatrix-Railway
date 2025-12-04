@@ -1,288 +1,460 @@
-// app.js — Feature-rich frontend for GearMatrix Pro
-let gearCount = 0;
-let chart = null;
-let lastCalc = null;
+/* app.js
+   GearMatrix Pro v2 — single-folder edition with Python Matplotlib plotting
+*/
 
-// utility
-const $ = id => document.getElementById(id);
-const api = (path, opts={}) => fetch(path, opts).then(r=>r.json());
+(() => {
+  // ---------- DOM ----------
+  const startupModal = document.getElementById('startupModal');
+  const appRoot = document.getElementById('appRoot');
+  const libraryLabel = document.getElementById('libraryLabel');
 
-// ----------------- Navigation & theme -----------------
-document.querySelectorAll('.sidebar nav li').forEach(li=>{
-  li.addEventListener('click', ()=> {
-    document.querySelectorAll('.sidebar nav li').forEach(x=>x.classList.remove('active'));
-    li.classList.add('active');
-    const view = li.getAttribute('data-view');
-    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-    document.getElementById(view).classList.remove('hidden');
+  const gearTypeSelect = document.getElementById('gearTypeSelect');
+  const moduleInput = document.getElementById('moduleInput');
+  const teethInput = document.getElementById('teethInput');
+  const radiusInput = document.getElementById('radiusInput');
+  const pressureAngle = document.getElementById('pressureAngle');
+  const helixAngle = document.getElementById('helixAngle');
+  const helixHand = document.getElementById('helixHand');
+  const connectsTo = document.getElementById('connectsTo');
+  const inputRPM = document.getElementById('inputRPM');
+  const gearRole = document.getElementById('gearRole');
+
+  const addGearBtn = document.getElementById('addGear');
+  const calcBtn = document.getElementById('calcBtn');
+  const saveJsonBtn = document.getElementById('saveJson');
+  const saveServerBtn = document.getElementById('saveServer');
+  const uploadJsonBtn = document.getElementById('uploadJson');
+  const exportCsvBtn = document.getElementById('exportCsv');
+  const fileInput = document.getElementById('fileInput');
+
+  const validationPanel = document.getElementById('validationPanel');
+  const resultsPre = document.getElementById('resultsPre');
+  const copyResultsBtn = document.getElementById('copyResults');
+  const plotImage = document.getElementById('plotImage');
+
+  const savedList = document.getElementById('savedList');
+  const refreshSaved = document.getElementById('refreshSaved');
+
+  // Sidebar nav
+  const sections = Array.from(document.querySelectorAll('.section'));
+  document.querySelectorAll('.sidebar nav button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.sidebar nav button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      sections.forEach(s => s.classList.remove('active'));
+      const id = btn.dataset.section;
+      document.getElementById(id).classList.add('active');
+    });
   });
-});
 
+  // ---------- LIBRARIES ----------
+  const LIBRARIES = {
+    A: [
+      'Spur',
+      'Helical',
+      'Bevel (straight)',
+      'Worm (single-start)',
+      'Planetary (basic)',
+      'Rack & Pinion',
+      'Internal Ring'
+    ],
+    B: [
+      'Spur',
+      'Helical',
+      'Double Helical (Herringbone)',
+      'Bevel (straight)',
+      'Bevel (spiral)',
+      'Worm (single & multi-start)',
+      'Hypoid',
+      'Planetary (advanced)',
+      'Rack & Pinion',
+      'Face Gear',
+      'Crossed Helical',
+      'Crown'
+    ],
+    C: [
+      'Spur',
+      'Helical',
+      'Double Helical (Herringbone)',
+      'Bevel (straight)',
+      'Bevel (spiral/zerol)',
+      'Worm (multi-start)',
+      'Hypoid',
+      'Planetary (full)',
+      'Rack & Pinion',
+      'Face Gear',
+      'Crossed Helical',
+      'Crown',
+      'Cycloidal',
+      'Non-circular (elliptic)',
+      'Harmonic Drive',
+      'Magnetic Gear'
+    ]
+  };
 
-const themeToggle = $('themeToggle');
+  let selectedLibrary = null;
+  let gears = [];
+  let editIndex = null;
 
-// Apply theme based on localStorage value (or default 'light')
-function applyTheme() {
-  const t = localStorage.getItem('gm-theme') || 'light';
-
-  if (t === 'dark') {
-    // Set CSS variables for dark theme
-    document.documentElement.style.setProperty('--bg', '#071023');
-    document.documentElement.style.setProperty('--card', '#071422');
-    document.documentElement.style.setProperty('--text', '#e6f7ff');
-    document.documentElement.style.setProperty('--muted', '#9fb4c6');
-    document.documentElement.style.setProperty('--accent', '#0ea5e9');
-    // update button label so user knows current action
-    if (themeToggle) themeToggle.textContent = 'Light';
-  } else {
-    // Set CSS variables for light theme
-    document.documentElement.style.setProperty('--bg', '#ffffff');
-    document.documentElement.style.setProperty('--card', '#fff');
-    document.documentElement.style.setProperty('--text', '#0f172a');
-    document.documentElement.style.setProperty('--muted', '#64748b');
-    document.documentElement.style.setProperty('--accent', '#0ea5e9');
-    if (themeToggle) themeToggle.textContent = 'Dark';
-  }
-
-  // Also ensure body uses the --bg var immediately
-  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || (t === 'dark' ? '#071023' : '#ffffff');
-  document.body.style.background = bg;
-}
-
-// Toggle handler — flips the value and reapplies
-if (themeToggle) {
-  themeToggle.addEventListener('click', () => {
-    const cur = localStorage.getItem('gm-theme') || 'light';
-    const next = cur === 'light' ? 'dark' : 'light';
-    localStorage.setItem('gm-theme', next);
-    applyTheme();
+  // ---------- STARTUP CHOICE ----------
+  document.querySelectorAll('.choice').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const choice = btn.dataset.choice;
+      selectedLibrary = choice;
+      startupModal.classList.add('hide');
+      appRoot.removeAttribute('aria-hidden');
+      libraryLabel.textContent = `Library: Option ${choice}`;
+      populateGearTypes(choice);
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById('calculator').classList.add('active');
+    });
   });
-}
 
-// Ensure theme is applied on load
-applyTheme();
-// ----------------------------------------------------------------
-
-
-// ----------------- Login modal (mock) -----------------
-$('openLogin').addEventListener('click', ()=> $('loginModal').classList.remove('hidden'));
-$('loginCancel').addEventListener('click', ()=> $('loginModal').classList.add('hidden'));
-$('loginSubmit').addEventListener('click', ()=>{
-  const u = $('loginUser').value, p = $('loginPass').value;
-  if(!u){ alert('enter user'); return; }
-  // mock: store user
-  localStorage.setItem('gm-user', JSON.stringify({user:u, ts:Date.now()}));
-  $('loginModal').classList.add('hidden');
-  alert('Logged in as ' + u + ' (mock)');
-});
-
-// ----------------- Gear row UI -----------------
-function addGear(preset={}) {
-  const container = $('gears');
-  const id = gearCount++;
-  const row = document.createElement('div'); row.className='gear-row'; row.id='gear-'+id;
-  row.innerHTML = `
-    <strong>#${id}</strong>
-    <select id="type-${id}">
-      <option>Spur</option><option>Helical</option><option>Bevel</option><option>Worm</option><option>Internal</option>
-    </select>
-    <input id="teeth-${id}" placeholder="Teeth" value="${preset.teeth||20}" style="width:70px">
-    <input id="radius-${id}" placeholder="Radius" value="${preset.radius||50}" style="width:90px">
-    <input id="module-${id}" placeholder="Module" value="${preset.module||''}" style="width:90px">
-    <input id="connects-${id}" placeholder="Connects (csv)" value="${preset.connects||''}" style="width:120px">
-    <input id="mesh-${id}" placeholder="Mesh eff (%)" value="${preset.mesh_eff||98}" style="width:90px">
-    <button onclick="removeGear(${id})" class="btn small">Del</button>
-  `;
-  container.appendChild(row);
-}
-function removeGear(id){ const el = $('gear-'+id); if(el) el.remove(); }
-
-// initial gear
-addGear();
-
-// ----------------- API actions -----------------
-$('addGear').addEventListener('click', ()=> addGear());
-$('calcBtn').addEventListener('click', calculate);
-
-// save/list/load
-$('saveSet').addEventListener('click', async()=>{
-  const name = prompt('Set name (alphanumeric)');
-  if(!name) return;
-  const payload = buildPayload();
-  payload.name = name;
-  const r = await api('/api/save-set', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
-  if(r.error) alert('Save failed: '+r.error); else alert('Saved: '+r.filename);
-});
-$('listSets').addEventListener('click', async()=>{
-  const r = await api('/api/list-sets');
-  if(r.sets) {
-    const out = r.sets.map(s=>`<div><a href="#" onclick="loadSet('${s}')">${s}</a></div>`).join('');
-    $('savedList').innerHTML = out || '(no sets)';
-    // jump to Saved tab
-    document.querySelector('[data-view="saved"]').click();
-  }
-});
-
-window.loadSet = async (name) => {
-  const r = await api('/api/load-set/' + encodeURIComponent(name));
-  if(r.error) { alert(r.error); return; }
-  // populate UI
-  // clear current
-  $('gears').innerHTML=''; gearCount=0;
-  $('rpm').value = r.rpm_input || $('rpm').value;
-  $('torque').value = r.torque_input || $('torque').value;
-  (r.gears || []).forEach(g => addGear(g));
-  alert('Loaded set: '+name);
-  document.querySelector('[data-view="designer"]').click();
-};
-
-// export CSV via backend (requires lastCalc)
-$('exportCsv').addEventListener('click', async ()=>{
-  if(!lastCalc){ alert('Run calculation first'); return; }
-  // backend expects POST /api/export-csv with last_result payload
-  const res = await fetch('/api/export-csv', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastCalc)});
-  if(!res.ok){ const err = await res.json(); alert('Export failed: '+(err.error||res.statusText)); return; }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = 'gearmatrix_export.csv'; a.click();
-});
-
-// export PDF (client-side)
-$('exportPdf').addEventListener('click', async ()=>{
-  if(!lastCalc){ alert('Run calculation first'); return; }
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  doc.setFontSize(14); doc.text('GearMatrix Pro - Report', 14, 18);
-  doc.setFontSize(10); doc.text('Generated: ' + new Date().toLocaleString(), 14, 28);
-  doc.setFontSize(9);
-  let y = 36;
-  doc.text('Results:', 14, y); y+=6;
-  const lines = JSON.stringify(lastCalc, null, 2).split('\n');
-  for(let i=0;i<lines.length;i++){
-    if(y>270){ doc.addPage(); y=20; }
-    doc.text(lines[i].substring(0,120), 14, y);
-    y+=5;
-  }
-  doc.save('gearmatrix_report.pdf');
-});
-
-// ----------------- Build payload -----------------
-function buildPayload(){
-  const unit = $('unit').value;
-  const torqueUnit = $('torqueUnit').value;
-  const rpm = $('rpm').value; const torque = $('torque').value;
-  const gears = [];
-  for(let i=0;i<gearCount;i++){
-    const row = $('gear-'+i);
-    if(!row) continue;
-    gears.push({
-      type: $('type-'+i).value,
-      teeth: $('teeth-'+i).value,
-      radius: $('radius-'+i).value,
-      module: $('module-'+i).value,
-      connects: $('connects-'+i).value,
-      mesh_eff: $('mesh-'+i).value
+  function populateGearTypes(choice) {
+    gearTypeSelect.innerHTML = '';
+    (LIBRARIES[choice] || []).forEach(t => {
+      const opt = document.createElement('option'); opt.value = t; opt.textContent = t;
+      gearTypeSelect.appendChild(opt);
     });
   }
-  return { unit, torque_unit: torqueUnit, rpm_input: rpm, torque_input: torque, gears };
-}
 
-// ----------------- Calculation -----------------
-async function calculate(){
-  const payload = buildPayload();
-  const res = await fetch('/api/calc', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
-  const data = await res.json();
-  if(data.error){ $('resultText').textContent = 'Error: '+data.error; return; }
-  lastCalc = data;
-  $('resultText').textContent = JSON.stringify(data, null, 2);
-  drawChart(data);
-  drawDiagram(payload, data);
-}
+  // ---------- LIVE VALIDATION ENGINE ----------
+  function mkmsg(severity, title, detail) { return { severity, title, detail }; }
 
-// ----------------- Chart (Chart.js with zoom) -----------------
-function drawChart(data){
-  const gearStates = data.gear_states || {};
-  const idxs = Object.keys(gearStates).map(Number).sort((a,b)=>a-b);
-  const rpms = idxs.map(i => gearStates[i].rpm || 0);
-  const torques = idxs.map(i => gearStates[i].torque || 0);
-  const ctx = $('chart').getContext('2d');
-  if(chart) chart.destroy();
-  chart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: idxs,
-      datasets: [
-        { label:'RPM', data: rpms, borderColor:'#0284c7', tension:0.2, fill:false },
-        { label:'Torque (Nm)', data: torques, borderColor:'#ef4444', tension:0.2, fill:false }
-      ]
-    },
-    options: {
-      responsive:true,
-      plugins: {
-        zoom: {
-          pan: { enabled:true, mode:'x' },
-          zoom: { wheel:{enabled:true}, pinch:{enabled:true}, mode:'x' }
-        }
+  function validatePair(g1, g2) {
+    const messages = [];
+    if (Math.abs((g1.module||0) - (g2.module||0)) > 1e-6) {
+      messages.push(mkmsg('ERROR','Module mismatch',`m1=${g1.module}, m2=${g2.module} → cannot mesh.`));
+    }
+    if (String(g1.pressureAngle) !== String(g2.pressureAngle)) {
+      messages.push(mkmsg('ERROR','Pressure angle mismatch',`φ1=${g1.pressureAngle}°, φ2=${g2.pressureAngle}°`));
+    }
+    const d1 = g1.pitchDiameter || g1.radius || (g1.module * g1.teeth);
+    const d2 = g2.pitchDiameter || g2.radius || (g2.module * g2.teeth);
+    if ((g1.type||'').toLowerCase().includes('helical') || (g2.type||'').toLowerCase().includes('helical')) {
+      if (Number(g1.helixAngle) !== Number(g2.helixAngle)) {
+        messages.push(mkmsg('WARN','Helix angle difference',`β1=${g1.helixAngle}°, β2=${g2.helixAngle}°`));
+      }
+      if (g1.role === 'External' && g2.role === 'External' && g1.helixHand === g2.helixHand) {
+        messages.push(mkmsg('ERROR','Helix-hand mismatch','External helical gears must be RH↔LH.'));
       }
     }
-  });
-}
-
-// ----------------- Simple 2D Gear Diagram -----------------
-function drawDiagram(payload, calcData){
-  const container = $('diagramArea');
-  container.innerHTML = ''; // clear
-  // compute simple layout: place gears on a horizontal line, x positions accumulate radius
-  const gears = payload.gears || [];
-  if(gears.length===0){ container.innerHTML = '<em>No gears</em>'; return; }
-  const svgNS = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(svgNS,'svg');
-  svg.setAttribute('width','100%'); svg.setAttribute('height','360'); svg.setAttribute('viewBox','0 0 1200 360');
-  let x = 80;
-  const scale = 2.5; // scale radii to px
-  // store centers
-  const centers = [];
-  gears.forEach((g,i)=>{
-    const r = Math.max(6, Number(g.radius||50) * scale / 10);
-    const cy = 180;
-    const cx = x;
-    centers.push({cx,cy,r});
-    x += r*2 + 40; // spacing
-  });
-  // draw links (if connects provided)
-  gears.forEach((g,i)=>{
-    const conns = (g.connects||'').split(',').map(s=>s.trim()).filter(s=>s!=='').map(Number);
-    conns.forEach(c=>{
-      if(centers[c]){
-        const line = document.createElementNS(svgNS,'line');
-        line.setAttribute('x1', centers[i].cx); line.setAttribute('y1', centers[i].cy);
-        line.setAttribute('x2', centers[c].cx); line.setAttribute('y2', centers[c].cy);
-        line.setAttribute('stroke','#cbd5e1'); line.setAttribute('stroke-width','2');
-        svg.appendChild(line);
+    if ((g1.type||'').toLowerCase().includes('worm') || (g2.type||'').toLowerCase().includes('worm')) {
+      const other = (g1.type||'').toLowerCase().includes('worm') ? g2 : g1;
+      if (!((other.type||'').toLowerCase().includes('wheel') || (other.type||'').toLowerCase().includes('worm') || (other.type||'').toLowerCase().includes('ring'))) {
+        messages.push(mkmsg('ERROR','Invalid worm mesh','Worm must mesh with worm wheel only.'));
       }
-    });
-  });
-  // draw gears
-  centers.forEach((ct,i)=>{
-    const ggroup = document.createElementNS(svgNS,'g');
-    const circle = document.createElementNS(svgNS,'circle');
-    circle.setAttribute('cx', ct.cx); circle.setAttribute('cy', ct.cy); circle.setAttribute('r', ct.r);
-    circle.setAttribute('fill','#f8fafc'); circle.setAttribute('stroke','#94a3b8'); circle.setAttribute('stroke-width','2');
-    ggroup.appendChild(circle);
-    const text = document.createElementNS(svgNS,'text');
-    text.setAttribute('x', ct.cx); text.setAttribute('y', ct.cy+4); text.setAttribute('text-anchor','middle');
-    text.setAttribute('font-size','12'); text.setAttribute('fill','#0f172a'); text.textContent = `G${i}`;
-    ggroup.appendChild(text);
-    // small rotate animation
-    ggroup.style.transformOrigin = `${ct.cx}px ${ct.cy}px`;
-    ggroup.style.animation = `spin ${8 - (i%5)}s linear infinite`;
-    svg.appendChild(ggroup);
-  });
-  container.appendChild(svg);
-}
+    }
+    const expectedC = (g1.role === 'Internal' || g2.role === 'Internal') ? Math.abs((d2 - d1) / 2.0) : (d1 + d2) / 2.0;
+    if (!(expectedC > 0)) {
+      messages.push(mkmsg('CRITICAL','Invalid centre distance',`Computed centre distance ≤ 0 (d1=${d1}, d2=${d2}).`));
+    }
+    const ratio = d1 / d2;
+    if (Math.abs(ratio) > 15 && !((g1.type||'').toLowerCase().includes('worm') || (g2.type||'').toLowerCase().includes('worm'))) {
+      messages.push(mkmsg('WARN','Excessive gear ratio',`d1/d2=${ratio.toFixed(2)} exceed recommended limit.`));
+    }
+    return messages;
+  }
 
-// initial hook
-document.addEventListener('DOMContentLoaded', ()=>{
-  // default nav
-  document.querySelector('[data-view="designer"]').click();
-});
+  function validateSingleAgainstExisting(newGear, existingGears) {
+    const msgs = [];
+    existingGears.forEach((g, idx) => {
+      const pairMsgs = validatePair(newGear, g);
+      pairMsgs.forEach(m => {
+        m.detail = `New ↔ G${idx+1}: ${m.detail || m.title || ''}`;
+        msgs.push(m);
+      });
+    });
+    return msgs;
+  }
+
+  function runLiveValidation() {
+    const newGear = {
+      type: gearTypeSelect.value,
+      module: parseFloat(moduleInput.value) || 0,
+      teeth: parseInt(teethInput.value) || 0,
+      pitchDiameter: parseFloat(radiusInput.value) || (parseFloat(moduleInput.value) * parseInt(teethInput.value) || 0),
+      pressureAngle: parseFloat(pressureAngle.value) || 20,
+      helixAngle: parseFloat(helixAngle.value) || 0,
+      helixHand: helixHand.value || 'RH',
+      role: gearRole.value || 'External'
+    };
+
+    const msgs = validateSingleAgainstExisting(newGear, gears);
+    const severityOrder = { 'CRITICAL': 0, 'ERROR': 1, 'WARN': 2, 'INFO': 3 };
+    msgs.sort((a,b) => (severityOrder[a.severity]||3) - (severityOrder[b.severity]||3));
+
+    validationPanel.innerHTML = msgs.map(m => {
+      const cls = m.severity === 'CRITICAL' ? 'crit' : (m.severity === 'ERROR' ? 'err' : (m.severity === 'WARN' ? 'warn' : 'info'));
+      return `<div class="${cls}">[${m.severity}] ${m.title}: ${m.detail}</div>`;
+    }).join('') || '<div class="info">No immediate conflicts detected for this gear.</div>';
+
+    const hasFatal = msgs.some(m => m.severity === 'CRITICAL' || m.severity === 'ERROR');
+    if (hasFatal) {
+      addGearBtn.disabled = true; addGearBtn.style.opacity = 0.5; addGearBtn.title = "Fix validation errors first";
+    } else {
+      addGearBtn.disabled = false; addGearBtn.style.opacity = 1; addGearBtn.title = "";
+    }
+  }
+
+  // Attach live validation to inputs
+  [ gearTypeSelect, moduleInput, teethInput, radiusInput, pressureAngle, helixAngle, helixHand, gearRole ].forEach(el => {
+    el.addEventListener('input', runLiveValidation);
+    el.addEventListener('change', runLiveValidation);
+  });
+
+  // ---------- GEAR LIST UI (add/edit/remove) ----------
+  function loadGearIntoInputs(g) {
+    gearTypeSelect.value = g.type;
+    moduleInput.value = g.module;
+    teethInput.value = g.teeth;
+    radiusInput.value = g.pitchDiameter;
+    pressureAngle.value = g.pressureAngle;
+    helixAngle.value = g.helixAngle;
+    helixHand.value = g.helixHand;
+    connectsTo.value = g.connectsTo || '';
+    gearRole.value = g.role;
+    runLiveValidation();
+  }
+
+  function renderGearsTable() {
+    const list = gears.map((g, i) => {
+      return `<div style="padding:6px;border-bottom:1px solid #eef;display:flex;justify-content:space-between;align-items:center">
+        <div><strong>G${i+1}</strong> ${g.type} — m=${g.module} z=${g.teeth} d=${(g.pitchDiameter||g.radius).toFixed(2)}mm</div>
+        <div style="display:flex;gap:6px">
+          <button data-edit="${i}" class="editGear small">Edit</button>
+          <button data-idx="${i}" class="delGear small">Remove</button>
+        </div>
+      </div>`;
+    }).join('') || '<div>No gears configured.</div>';
+    validationPanel.innerHTML = list;
+    // attach handlers
+    document.querySelectorAll('.delGear').forEach(b => {
+      b.addEventListener('click', () => {
+        const idx = parseInt(b.dataset.idx);
+        gears.splice(idx, 1);
+        renderGearsTable();
+      });
+    });
+    document.querySelectorAll('.editGear').forEach(b => {
+      b.addEventListener('click', () => {
+        editIndex = parseInt(b.dataset.edit);
+        loadGearIntoInputs(gears[editIndex]);
+        addGearBtn.textContent = "Save Changes";
+      });
+    });
+  }
+
+  addGearBtn.addEventListener('click', () => {
+    // build gear object
+    const gear = {
+      type: gearTypeSelect.value,
+      module: parseFloat(moduleInput.value) || 0,
+      teeth: parseInt(teethInput.value) || 0,
+      pitchDiameter: parseFloat(radiusInput.value) || (parseFloat(moduleInput.value) * parseInt(teethInput.value) || 0),
+      radius: parseFloat(radiusInput.value) || (parseFloat(moduleInput.value) * parseInt(teethInput.value) || 0),
+      pressureAngle: parseFloat(pressureAngle.value) || 20,
+      helixAngle: parseFloat(helixAngle.value) || 0,
+      helixHand: helixHand.value || 'RH',
+      connectsTo: connectsTo.value || '',
+      role: gearRole.value || 'External'
+    };
+
+    if (addGearBtn.disabled) {
+      alert('Cannot add gear: fix validation errors first.');
+      return;
+    }
+
+    if (editIndex !== null) {
+      gears[editIndex] = gear;
+      editIndex = null;
+      addGearBtn.textContent = "+ Add Gear";
+    } else {
+      gears.push(gear);
+    }
+    renderGearsTable();
+    runLiveValidation();
+  });
+
+  // ---------- SAVE / LOAD / EXPORT ----------
+  saveJsonBtn.addEventListener('click', () => {
+    const payload = { meta: { savedAt: new Date().toISOString(), library: selectedLibrary }, gears };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `gearmatrix_config_${Date.now()}.json`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+
+  uploadJsonBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (ev) => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (parsed.gears && Array.isArray(parsed.gears)) {
+          gears = parsed.gears;
+          renderGearsTable();
+          validationPanel.innerHTML = '<div class="info">Loaded configuration from file.</div>';
+        } else {
+          alert('Invalid JSON: expected { gears: [...] }');
+        }
+      } catch (err) {
+        alert('Invalid JSON file.');
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  exportCsvBtn.addEventListener('click', () => {
+    if (!gears.length) { alert('No gears to export'); return; }
+    const header = ['index,type,module,teeth,pitchDiameter,pressureAngle,helixAngle,helixHand,connectsTo,role'];
+    const rows = gears.map((g, i) => `${i+1},${g.type},${g.module},${g.teeth},${g.pitchDiameter},${g.pressureAngle},${g.helixAngle},${g.helixHand},"${g.connectsTo}",${g.role}`);
+    const csv = header.concat(rows).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `gearmatrix_${Date.now()}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+
+  // ---------- SERVER SAVE & LIST ----------
+  saveServerBtn.addEventListener('click', async () => {
+    try {
+      const payload = { meta: { savedAt: new Date().toISOString(), library: selectedLibrary }, gears };
+      const resp = await fetch('/save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const j = await resp.json();
+      if (j.ok) { alert('Saved server-side: ' + j.filename); } else { alert('Save error: ' + JSON.stringify(j)); }
+    } catch (e) { alert('Server save failed: ' + e.message); }
+  });
+
+  refreshSaved.addEventListener('click', async () => {
+    try {
+      const resp = await fetch('/configs');
+      const j = await resp.json();
+      if (j.ok && Array.isArray(j.files)) {
+        savedList.innerHTML = j.files.map(f => `<div class="saved-card"><a href="/configs/${f}" target="_blank">${f}</a></div>`).join('');
+      } else savedList.textContent = 'No saved files.';
+    } catch (e) {
+      savedList.textContent = 'Failed to fetch saved files.';
+    }
+  });
+
+  // ---------- CALCULATION + Python plotting ----------
+  function calculate(gearArray) {
+    const n = gearArray.length;
+    if (n === 0) return { error: 'No gears configured.' };
+    const results = gearArray.map((g, i) => ({ index: i + 1, teeth: g.teeth, radius: g.pitchDiameter || g.radius, rpm: null, ratio: null, type: g.type }));
+
+    const input = parseFloat(inputRPM.value || 1000);
+    results[0].rpm = input; results[0].ratio = 1;
+
+    const iterations = Math.max(1, n);
+    for (let iter = 0; iter < iterations; iter++) {
+      for (let i = 0; i < n; i++) {
+        const from = gearArray[i];
+        if (!from.connectsTo) continue;
+        const toIndexes = from.connectsTo.split(',').map(s => parseInt(s.trim()) - 1).filter(x => !isNaN(x));
+        toIndexes.forEach(tidx => {
+          if (tidx < 0 || tidx >= n) return;
+          const to = gearArray[tidx];
+          const rpmFrom = results[i].rpm || input;
+          if (rpmFrom == null) return;
+          const rpmTo = rpmFrom * ((from.pitchDiameter || from.radius) / (to.pitchDiameter || to.radius));
+          results[tidx].rpm = rpmTo;
+          results[tidx].ratio = (results[i].ratio || 1) * ((from.pitchDiameter || from.radius) / (to.pitchDiameter || to.radius));
+        });
+      }
+    }
+    return { inputRPM: input, results };
+  }
+
+  // POST data to /plot2d and show returned PNG
+  async function renderPythonPlot(results) {
+    try {
+      const x = results.map(r => r.index);
+      const y = results.map(r => (r.rpm == null ? 0 : Number(r.rpm)));
+      const payload = { x, y, title: "RPM Progression", xlabel: "Gear Index", ylabel: "RPM", line_style: "-", marker: "o" };
+      const resp = await fetch("/plot2d", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!resp.ok) {
+        const j = await resp.json().catch(()=>null);
+        console.error("Plot error", j);
+        alert("Server plot generation failed.");
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      plotImage.src = url;
+    } catch (e) {
+      console.error("Error fetching matplotlib plot:", e);
+    }
+  }
+
+  calcBtn.addEventListener('click', () => {
+    // run validation: if there are any CRITICAL/ERROR messages, notify user
+    // We perform a full validation (pairwise checks) before calculating
+    const msgs = runFullValidation(); // reuse function below for full validation
+    const hasFatal = msgs.some(m => m.severity === 'CRITICAL' || m.severity === 'ERROR');
+    if (hasFatal) {
+      if (!confirm('Validation found CRITICAL/ERROR messages. Continue calculation anyway?')) return;
+    }
+
+    const res = calculate(gears);
+    if (res.error) {
+      resultsPre.textContent = res.error;
+    } else {
+      resultsPre.textContent = JSON.stringify(res, null, 2);
+      renderPythonPlot(res.results);
+    }
+  });
+
+  // ---------- Full (pairwise) validation used on Calculate ----------
+  function runFullValidation() {
+    const allMsgs = [];
+    for (let i = 0; i < gears.length; i++) {
+      const g = gears[i];
+      if (g.connectsTo) {
+        const targets = g.connectsTo.split(',').map(s => parseInt(s.trim()) - 1).filter(n => !isNaN(n));
+        targets.forEach(tidx => {
+          if (tidx < 0 || tidx >= gears.length) {
+            allMsgs.push(mkmsg('ERROR','Invalid connection',`Gear ${i+1} connects to index ${tidx+1} — index out of range.`));
+            return;
+          }
+          const msgs = validatePair(g, gears[tidx]);
+          msgs.forEach(m => { m.detail = `G${i+1} ↔ G${tidx+1}: ${m.detail || m.title}`; allMsgs.push(m); });
+        });
+      }
+    }
+    if (allMsgs.length === 0) allMsgs.push(mkmsg('INFO','No connections defined','No gear pair connections were provided.'));
+    const severityOrder = { 'CRITICAL': 0, 'ERROR': 1, 'WARN': 2, 'INFO': 3 };
+    allMsgs.sort((a,b) => (severityOrder[a.severity]||3) - (severityOrder[b.severity]||3));
+    validationPanel.innerHTML = allMsgs.map(m => {
+      const cls = m.severity === 'CRITICAL' ? 'crit' : (m.severity === 'ERROR' ? 'err' : (m.severity === 'WARN' ? 'warn' : 'info'));
+      return `<div class="${cls}">[${m.severity}] ${m.title}: ${m.detail}</div>`;
+    }).join('') || '<div class="info">No validation messages.</div>';
+    return allMsgs;
+  }
+
+  // copy results
+  copyResultsBtn.addEventListener('click', () => {
+    const txt = resultsPre.textContent || '';
+    navigator.clipboard?.writeText(txt).then(() => {
+      copyResultsBtn.textContent = 'Copied';
+      setTimeout(() => copyResultsBtn.textContent = 'Copy', 1200);
+    }).catch(() => alert('Copy failed.'));
+  });
+
+  // ---------- Init ----------
+  function initDefaults() {
+    // nothing to do; modal shows on load
+  }
+  initDefaults();
+
+  // expose for debug
+  window.GearMatrix = {
+    get gears() { return gears; },
+    set gears(v) { gears = v; renderGearsTable(); },
+    validate: runFullValidation
+  };
+
+})();
