@@ -21,19 +21,22 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 # Serve main UI from static/html/index.html
 @app.route('/')
 def index():
-    # serve static/index.html if exists (common case)
-    if os.path.exists(os.path.join('static', 'index.html')):
+    # If frontend lives at static/index.html (your repo), serve that.
+    static_index = os.path.join('static', 'index.html')
+    if os.path.exists(static_index):
+        log.info("Serving static/index.html (project uses static/ layout)")
         return send_from_directory('static', 'index.html')
-    if os.path.exists('index.html'):
-        return send_from_directory('.', 'index.html')
-    return ("index.html not found. Ensure static/index.html or repo root index.html is present."), 500
 
-    # fallback to repo root index.html
+    # Fallback: repo-root index.html
     if os.path.exists('index.html'):
         log.info("Serving index.html from repo root")
         return send_from_directory('.', 'index.html')
-    log.error("index.html not found (static/html/index.html or repo root)")
-    return ("index.html not found. Ensure static/html/index.html or repo root index.html is present."), 500
+
+    # Fallback message for debugging
+    log.error("index.html not found (checked static/index.html and repo root)")
+    return ("index.html not found. Ensure static/index.html or repo root index.html is present."), 500
+
+
 
 # Serve any file requested; first try static/ folder then repo root
 @app.route('/<path:filename>')
